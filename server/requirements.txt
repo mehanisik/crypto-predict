@@ -1,0 +1,9 @@
+flask==2.0.1
+requests==2.26.0
+python-dotenv==0.19.0
+flask-cors==3.0.10
+pytest==6.2.5
+werkzeug==2.2.2
+yfinance
+numpy
+pandas

@@ -11,6 +11,7 @@ export interface MarketData {
   totalVolume: number;
   marketCap: number;
   totalSupply: number;
+  priceHistory: number[];
 }
 
 export enum TradingViewSymbols {

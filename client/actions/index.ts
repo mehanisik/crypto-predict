@@ -26,6 +26,7 @@ export const getMarketData = async (): Promise<MarketData[]> => {
       totalVolume: crypto.total_volume,
       marketCap: crypto.market_cap,
       totalSupply: crypto.total_supply,
+      priceHistory: crypto.sparkline_in_7d.price,
     };
   });
 };

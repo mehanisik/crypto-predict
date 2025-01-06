@@ -15,13 +15,13 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 import { formatNumber, formatPercentage } from "@/lib/utils";
 import { WidgetSkeleton } from "../ui/widget-skeleton";
+import SparklineChart from "../charts/sparkline-chart";
 
 export default function MarketOverviewWidget() {
   const { data, isLoading } = useQuery({
     queryKey: ["market-data"],
     queryFn: getMarketData,
   });
-  console.log(`fetched data`, data);
 
   if (isLoading) return <WidgetSkeleton title="Market Overview" />;
   return (
@@ -108,7 +108,8 @@ export default function MarketOverviewWidget() {
                   ${formatNumber(crypto.totalVolume)}
                 </TableCell>
                 <TableCell className="text-right">
-                  ${formatNumber(crypto.totalSupply)}
+                  <SparklineChart data={crypto.priceHistory} />
+                  {/*${formatNumber(crypto.totalSupply)}*/}
                 </TableCell>
               </TableRow>
             ))}
