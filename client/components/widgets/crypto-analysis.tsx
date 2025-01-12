@@ -4,12 +4,12 @@ import React, { useState } from "react";
 import BaseWidget from "@/components/ui/widget";
 import TradingWidget from "../charts/trading-widget";
 import { ToggleGroup, ToggleGroupItem } from "../ui/toggle-group";
+import { TradingViewSymbols } from "@/constants/trading-view-symbols.constant";
 
 export default function CryptoAnalysisWidget() {
-  const [selectedCrypto, setSelectedCrypto] = useState<
-    "BTCUSDT" | "ETHUSDT" | "DOGEUSDT" | "XRPUSDT" | "SOLUSDT"
-  >("BTCUSDT");
-
+  const [selectedCrypto, setSelectedCrypto] = useState<TradingViewSymbols>(
+    TradingViewSymbols.ETH_USDT
+  );
 
   return (
     <BaseWidget
@@ -19,21 +19,21 @@ export default function CryptoAnalysisWidget() {
           <ToggleGroup
             variant="outline"
             type="single"
-            defaultValue="BTCUSDT"
-            onValueChange={(value) =>
-              value && setSelectedCrypto(value as typeof selectedCrypto)
+            defaultValue={selectedCrypto}
+            onValueChange={(value: TradingViewSymbols) =>
+              value && setSelectedCrypto(value)
             }
           >
-            <ToggleGroupItem value="BTCUSDT">BTC</ToggleGroupItem>
-            <ToggleGroupItem value="ETHUSDT">ETH</ToggleGroupItem>
-            <ToggleGroupItem value="DOGEUSDT">DOGE</ToggleGroupItem>
-            <ToggleGroupItem value="XRPUSDT">XRP</ToggleGroupItem>
-            <ToggleGroupItem value="SOLUSDT">SOL</ToggleGroupItem>
+            {Object.entries(TradingViewSymbols).map(([key, value]) => (
+              <ToggleGroupItem key={key} value={value}>
+                {key}
+              </ToggleGroupItem>
+            ))}
           </ToggleGroup>
         </div>
       }
     >
-      <div className="w-full h-[350px]">
+      <div className="w-full h-full">
         <TradingWidget symbol={selectedCrypto} />
       </div>
     </BaseWidget>

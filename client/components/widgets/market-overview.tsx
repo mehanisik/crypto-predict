@@ -14,19 +14,17 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { ScrollArea } from "../ui/scroll-area";
 import { formatNumber, formatPercentage } from "@/lib/utils";
-import { WidgetSkeleton } from "../ui/widget-skeleton";
 import SparklineChart from "../charts/sparkline-chart";
 
 export default function MarketOverviewWidget() {
-  const { data, isLoading } = useQuery({
+  const { data } = useQuery({
     queryKey: ["market-data"],
     queryFn: getMarketData,
   });
 
-  if (isLoading) return <WidgetSkeleton title="Market Overview" />;
   return (
     <BaseWidget title="Market Overview">
-      <ScrollArea className="border-t h-[350px]">
+      <ScrollArea className="border-t">
         <Table className="h-full">
           <TableHeader>
             <TableRow>

@@ -1,4 +1,6 @@
+import server from "@/lib/axiox";
 import { MarketData } from "@/types/crypto";
+import Error from "next/error";
 
 export const getMarketData = async (): Promise<MarketData[]> => {
   const response = await fetch(
@@ -29,4 +31,14 @@ export const getMarketData = async (): Promise<MarketData[]> => {
       priceHistory: crypto.sparkline_in_7d.price,
     };
   });
+};
+
+export const startModel = async () => {
+  const response = await server.post("/train");
+  return response.data;
+};
+
+export const getStatusOfModel = async () => {
+  const response = await server.get("/status");
+  return response.data;
 };

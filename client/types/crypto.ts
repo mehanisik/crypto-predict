@@ -13,11 +13,3 @@ export interface MarketData {
   totalSupply: number;
   priceHistory: number[];
 }
-
-export enum TradingViewSymbols {
-  BTC_USDT = "BINANCE:BTCUSDT",
-  ETH_USDT = "BINANCE:ETHUSDT",
-  DOGE_USDT = "BINANCE:DOGEUSDT",
-  XRP_USDT = "BINANCE:XRPUSDT",
-  SOL_USDT = "BINANCE:SOLUSDT",
-}

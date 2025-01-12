@@ -1,18 +1,18 @@
-from flask import Flask
+from flask import Flask, render_template
+from flask_socketio import SocketIO
 from flask_cors import CORS
-from app.config import Config
-from app.extensions import init_extensions
-from app.api.routes import api_bp
 
-def create_app(config_class=Config):
+
+socketio = SocketIO(cors_allowed_origins="*")
+
+def create_app():
     app = Flask(__name__)
-    app.config.from_object(config_class)
-    
-    init_extensions(app)
-    
+    app.config.from_object("app.config.Config")
+    socketio.init_app(app, cors_allowed_origins="*")
     CORS(app)
-    
-    app.register_blueprint(api_bp, url_prefix="/api")
-    
-    
+
+    from app.routes.stock import stock_blueprint
+    app.register_blueprint(stock_blueprint, url_prefix="/api")
+
+  
     return app
