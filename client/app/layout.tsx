@@ -5,6 +5,7 @@ import Navbar from "@/components/layout/navbar";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import QueryProvider from "@/components/providers/query-provider";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -51,6 +52,7 @@ export default function RootLayout({
             <main className="flex-1 h-[calc(100vh-4rem)] overflow-hidden">
               {children}
             </main>
+            <SpeedInsights sampleRate={0.5} />
           </QueryProvider>
         </ThemeProvider>
       </body>
