@@ -1,29 +1,101 @@
-# 🌐 Crypto Market Predictions based on ML Model Client
+# Cryptocurrency Prediction Dashboard
 
-This is a client-side application built using **Next.js** and **Tailwind CSS**. It fetches data from a server-side REST API and displays it in a user-friendly and visually appealing way.
+![Next.js](https://img.shields.io/badge/Next.js-15.1.2-black.svg)
+![React](https://img.shields.io/badge/React-19.0.0-black.svg)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.0.0-black.svg)
+![License](https://img.shields.io/badge/License-MIT-black.svg)
 
-## 🛠️ Features
+Real-time cryptocurrency price prediction interface with model training visualization and WebSocket integration.
 
-- **🔄 Real-time Prices**: Fetches real-time prices for selected cryptocurrencies.
-- **📈 Market Trends**: Displays market trends for selected cryptocurrencies, including price movements, trading volume, and historical performance.
-- **🚀 Top Movers**: Shows the top movers in the market for selected cryptocurrencies.
-- **🧩 Modular Widgets**: Provides a variety of widgets for displaying market data.
-- **📊 Graphs and Charts**: Displays graphs and charts for analyzing market trends.
-- **🔗 Correlation Analysis**: Provides correlation analysis for selected cryptocurrencies, such as examining relationships with market indices, other cryptocurrencies, or trading volumes.
-- **🤖 AI Model Predictions**: Uses an AI model to predict future prices for selected cryptocurrencies by analyzing historical data, market trends, and trading volumes gathered from the server via a REST API.
-- **💬 Sentiment Analysis**: Uses sentiment analysis to analyze market sentiment for selected cryptocurrencies.
-- **📰 Market News and Updates**: Displays market news and updates for selected cryptocurrencies.
-- **📋 Detailed Cryptocurrency Analysis**: Provides detailed analysis for selected cryptocurrencies including technical indicators, price metrics, prediction accuracy, and volume analysis.
-- **🎨 Customizable Themes**: Provides the ability to customize the theme of the application.
-- **⚙️ Customizable Widgets**: Allows users to customize the widgets displayed in the application.
-- **🌐 Forums and Community**: Provides a forum and community for users to engage in discussions, vote on ideas, and share valuable resources or market insights.
+## Features
 
-## 🧰 Technologies Used
+- Real-time price prediction charts
+- Model training progress monitoring
+- Historical performance analysis
+- WebSocket-based training updates
+- Responsive mobile-first design
+- Dark/Light theme support
 
-- **⚡ Next.js**: A React-based framework for server-side rendering and static site generation (version 15) and React (version 19).
-- **🎨 Tailwind CSS**: A utility-first CSS framework that provides a set of pre-designed classes for styling HTML elements.
-- **📘 TypeScript**: A superset of JavaScript that adds static typing and other features to the language.
-- **🖼️ Shadcn/UI**: A set of React components built on top of Tailwind CSS.
-- **🔒 Zustand**: A state management library for React applications.
-- **📡 React Query**: A library for fetching data from APIs in a performant and easy-to-use way.
-- **✨ Lucide React**: A set of React components built on top of Tailwind CSS.
+## Technologies Used
+
+- **Framework**: Next.js 15 (App Router)
+- **Visualization**: Recharts
+- **Styling**: Tailwind CSS + CSS Modules
+- **API Client**: Axios
+- **WebSocket**: Socket.IO Client
+- **Form Handling**: React Hook Form
+- **Utilities**: date-fns, lodash
+- **Type Checking**: TypeScript 5
+- **Linting**: ESLint + Prettier
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18.x+
+- npm 9.x+
+- Running ML Server (see [server README](../server/README.md))
+
+### Installation
+
+```bash
+git clone https://github.com/your-repo/crypto-prediction.git
+cd client
+npm install
+```
+
+### Environment Setup
+
+Create `.env.local` file:
+
+```env
+NEXT_PUBLIC_BASE_URL=http://localhost:5000
+NEXT_PUBLIC_CRYPTO_DATA_API=
+NEXT_PUBLIC_TRADING_VIEW_URL=
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+### Production Build
+
+```bash
+npm run build
+npm start
+```
+
+## Project Structure
+
+```
+client/
+├── app/
+│   ├── dashboard/
+│   │   └── page.tsx       # Main dashboard
+│   ├── layout.tsx         # Root layout
+│   └── not-found.tsx     # 404 page
+├── components/
+│   ├── charts/           # Recharts components
+│   ├── training/         # Progress indicators
+│   └── widgets/          # Dashboard main widgets
+│   └── ui/               # Shadcn/ui components
+
+├── lib/
+│   ├── api.ts            # Axios client
+│   └── websocket.ts      # Socket.IO client
+├── styles/
+│   ├── globals.css       # Tailwind imports
+│   └── variables.module.css # CSS variables
+└── types/
+    └── api.ts            # TypeScript interfaces
+```
+
+## Environment Variables
+
+| Variable Name                  | Description                  | Required |
+| ------------------------------ | ---------------------------- | -------- |
+| `NEXT_PUBLIC_BASE_URL`         | ML Server API base URL       | Yes      |
+| `NEXT_PUBLIC_CRYPTO_URL`       | Historical crypto data API   | No       |
+| `NEXT_PUBLIC_TRADING_VIEW_URL` | Trading view widget endpoint | No       |

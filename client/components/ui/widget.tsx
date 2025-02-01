@@ -1,44 +1,52 @@
-import React, {Suspense} from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "./card";
-import { cn } from "@/lib/utils";
-import {WidgetSkeleton} from "@/components/ui/widget-skeleton";
+"use client";
 
-export interface BaseWidgetProps {
+import { Maximize2 } from "lucide-react";
+import { Suspense, useState } from "react";
+import { Button } from "./button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
+import { WidgetSkeleton } from "./widget-skeleton";
+
+interface WidgetProps {
   title: string;
-  className?: string;
-  headerContent?: React.ReactNode;
+  id?: string;
   children?: React.ReactNode;
-  footerContent?: React.ReactNode;
+  headerContent?: React.ReactNode;
 }
 
-export default function BaseWidget(props: BaseWidgetProps) {
+export function Widget({ id, title, children, headerContent }: WidgetProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   return (
-     <Suspense fallback={<WidgetSkeleton title={"Loading"}/> }>
-       <Card
-           className={cn(
-               "h-[400px] flex flex-col border rounded-lg shadow-sm bg-muted/50",
-               props.className
-           )}
-       >
-         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 px-4 pt-3">
-           <CardTitle className="text-lg font-medium text-card-foreground">
-             {props.title}
-           </CardTitle>
-           {props.headerContent && (
-               <div className="flex items-center gap-2">
-                 {props.headerContent}
-               </div>
-           )}
-         </CardHeader>
-         <CardContent className="flex-1 min-h-0 overflow-auto px-4 pb-3">
-           {props.children}
-         </CardContent>
-         {props.footerContent && (
-             <div className="px-4 py-3 border-t">
-               {props.footerContent}
-             </div>
-         )}
-       </Card>
-     </Suspense>
+    <Suspense fallback={<WidgetSkeleton title={title} />}>
+      <div id={id ? id : "container"} className="h-full w-full">
+        <div className="h-full p-4 flex flex-col">
+          <div className="flex items-center justify-between shrink-0">
+            <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+            <div className="flex gap-2 items-center">
+              {headerContent}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsExpanded(true)}
+                className="h-8 w-8"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+          <div className="flex-1 mt-4 overflow-hidden">{children}</div>
+        </div>
+
+        <Dialog open={isExpanded} onOpenChange={setIsExpanded}>
+          <DialogContent className="max-w-[90vw] w-[90vw] h-[90vh] flex flex-col">
+            <DialogHeader className="h-12">
+              <DialogTitle>{title}</DialogTitle>
+              {headerContent}
+            </DialogHeader>
+            <div className="flex-1 overflow-auto">{children}</div>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </Suspense>
   );
 }

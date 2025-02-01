@@ -1,20 +1,20 @@
 import { Card } from "@/components/ui/card";
 
-interface SparklineChartProps {
+interface SparkLineChartProps {
   data: number[];
   width?: number;
   height?: number;
 }
 
-export default function SparklineChart({
+export default function SparkLineChart({
   data,
   width = 100,
   height = 40,
-}: SparklineChartProps) {
+}: SparkLineChartProps) {
   if (!data.length) return null;
 
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  const min = data.reduce((acc, value) => (value < acc ? value : acc), data[0]);
+  const max = data.reduce((acc, value) => (value > acc ? value : acc), data[0]);
   const range = max - min;
 
   const isIncreasing = data[data.length - 1] > data[0];

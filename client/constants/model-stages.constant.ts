@@ -1,35 +1,26 @@
-import { StageConfig } from "@/types/stages";
-import { TaskStage } from "./task-stage.constant";
+export enum ModelStages {
+  PARAMETERS = "PARAMETERS",
+  TRAINING = "TRAINING",
+  EVALUATING = "EVALUATING",
+  VISUALIZING = "VISUALIZING",
+  PREDICTING = "PREDICTING",
+  RESULTS = "RESULTS",
+}
 
-export const STAGES: StageConfig[] = [
-  {
-    id: TaskStage.DataFetch,
-    label: "Data Fetching",
-    icon: "refresh-ccw",
-    description: "Retrieving historical price data",
-  },
-  {
-    id: TaskStage.Preprocessing,
-    label: "Preprocessing",
-    icon: "settings",
-    description: "Cleaning and preparing the data",
-  },
-  {
-    id: TaskStage.FeatureEngineering,
-    label: "Feature Engineering",
-    icon: "sliders-horizontal",
-    description: "Creating advanced indicators",
-  },
-  {
-    id: TaskStage.Training,
-    label: "Model Training",
-    icon: "roller-coaster",
-    description: "Training the AI model",
-  },
-  {
-    id: TaskStage.Evaluation,
-    label: "Model Evaluation",
-    icon: "clipboard",
-    description: "Evaluating the model performance",
-  },
-];
+export const MODEL_STAGE_LABELS: Record<ModelStages, string> = {
+  [ModelStages.PARAMETERS]: "Parameters",
+  [ModelStages.TRAINING]: "Training",
+  [ModelStages.EVALUATING]: "Evaluating",
+  [ModelStages.VISUALIZING]: "Visualizing",
+  [ModelStages.PREDICTING]: "Predicting",
+  [ModelStages.RESULTS]: "Results",
+};
+
+export const STAGE_TRANSITIONS: Record<ModelStages, ModelStages> = {
+  [ModelStages.PARAMETERS]: ModelStages.TRAINING,
+  [ModelStages.TRAINING]: ModelStages.EVALUATING,
+  [ModelStages.EVALUATING]: ModelStages.VISUALIZING,
+  [ModelStages.VISUALIZING]: ModelStages.PREDICTING,
+  [ModelStages.PREDICTING]: ModelStages.RESULTS,
+  [ModelStages.RESULTS]: ModelStages.RESULTS,
+};

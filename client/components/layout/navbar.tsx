@@ -1,28 +1,18 @@
-"use client";
+import { ThemeToggle } from "../theme/theme-toggle";
 
-import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { Button } from "../ui/button";
-import { BarChart3Icon } from "lucide-react";
-export default function Navbar() {
-  const isAuthenticated = false;
-
+export function Navbar() {
   return (
-    <div className="border-b ">
-      <div className="flex h-12 items-center container mx-auto">
+    <nav className="border-b h-14">
+      <div className="container mx-auto flex h-full items-center px-4">
         <div className="flex items-center space-x-2">
-          <BarChart3Icon className="w-6 h-6" />
-          <span className="font-bold text-xl">CryptoPredict</span>
+          <span className="text-xl font-bold">CryptoPredict</span>
         </div>
-
-        <div className="ml-auto flex items-center space-x-4">
+        <div className="ml-auto">
           <ThemeToggle />
-          {isAuthenticated ? (
-            <Button size="sm">Logout</Button>
-          ) : (
-            <Button>Login</Button>
-          )}
         </div>
       </div>
-    </div>
+    </nav>
   );
 }
+
+export default Navbar;

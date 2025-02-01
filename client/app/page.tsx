@@ -1,5 +1,7 @@
-import CryptoDashboard from "@/components/features/dashboard";
+import { redirect } from "next/navigation";
 
-export default function Home() {
-  return <CryptoDashboard />;
-}
+const Page = () => {
+  redirect("/dashboard");
+};
+
+export default Page;

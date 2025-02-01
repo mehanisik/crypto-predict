@@ -1,5 +1,5 @@
+import { Widget } from "./widget";
 import { Skeleton } from "./skeleton";
-import BaseWidget from "./widget";
 
 interface WidgetSkeletonProps {
   title: string;
@@ -7,8 +7,8 @@ interface WidgetSkeletonProps {
 
 export function WidgetSkeleton({ title }: WidgetSkeletonProps) {
   return (
-    <BaseWidget title={title}>
+    <Widget title={title}>
       <Skeleton className="h-full" />
-    </BaseWidget>
+    </Widget>
   );
 }
