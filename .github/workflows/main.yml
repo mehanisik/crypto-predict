@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
+      contents: read
     outputs:
       server: ${{ steps.filter.outputs.server }}
       client: ${{ steps.filter.outputs.client }}
@@ -30,15 +31,20 @@ jobs:
   trigger-workflows:
     needs: changes
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
       - name: Trigger Server Workflow
         if: needs.changes.outputs.server == 'true'
         uses: peter-evans/repository-dispatch@v3
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           event-type: trigger-server-workflow
 
       - name: Trigger Client Workflow
         if: needs.changes.outputs.client == 'true'
         uses: peter-evans/repository-dispatch@v3
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           event-type: trigger-client-workflow
