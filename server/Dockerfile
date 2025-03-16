@@ -30,7 +30,6 @@ ENV PYTHONUNBUFFERED=1
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
 ENV PORT=5000
-ENV REDIS_URL=redis://redis:6379/0
 
 # Expose the port the app runs on
 EXPOSE 5000
