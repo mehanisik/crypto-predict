@@ -27,12 +27,13 @@ CORS(app, resources={
     }
 })
 
-redis_client = redis.Redis(host='redis', port=6379, db=0)
+redis_url = os.getenv('REDIS_URL', 'redis://redis:6379/0')
+redis_client = redis.from_url(redis_url)
 
 socketio = SocketIO(
     app,
     cors_allowed_origins=os.getenv('CORS_ORIGINS', '*'),
-    message_queue='redis://redis:6379/0',
+    message_queue=redis_url,
     async_mode='eventlet'
 )
 
