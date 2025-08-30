@@ -135,8 +135,36 @@ class CryptoPredictor:
 
             # Generate and validate predictions
             self.logger.info("generating_predictions")
-            train_pred = self.model.predict(X_train, verbose=0).squeeze()
-            test_pred = self.model.predict(X_test, verbose=0).squeeze()
+            train_pred = self.model.predict(X_train, verbose=0)
+            test_pred = self.model.predict(X_test, verbose=0)
+            
+            # Ensure predictions are arrays, not scalars
+            if train_pred.ndim == 0:
+                train_pred = np.array([train_pred])
+            else:
+                train_pred = train_pred.squeeze()
+                
+            if test_pred.ndim == 0:
+                test_pred = np.array([test_pred])
+            else:
+                test_pred = test_pred.squeeze()
+            
+            # Ensure predictions and targets have the same shape
+            if train_pred.shape != y_train.shape:
+                self.logger.warning("train_pred_shape_mismatch", 
+                                  pred_shape=train_pred.shape, 
+                                  target_shape=y_train.shape)
+                # Reshape if possible
+                if train_pred.size == y_train.size:
+                    train_pred = train_pred.reshape(y_train.shape)
+                    
+            if test_pred.shape != y_test.shape:
+                self.logger.warning("test_pred_shape_mismatch", 
+                                  pred_shape=test_pred.shape, 
+                                  target_shape=y_test.shape)
+                # Reshape if possible
+                if test_pred.size == y_test.size:
+                    test_pred = test_pred.reshape(y_test.shape)
             
             # Evaluation stage
             self.logger.info("starting_evaluation")

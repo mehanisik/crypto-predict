@@ -8,12 +8,12 @@ export enum ModelStages {
 }
 
 export const MODEL_STAGE_LABELS: Record<ModelStages, string> = {
-  [ModelStages.PARAMETERS]: "Parameters",
-  [ModelStages.TRAINING]: "Training",
-  [ModelStages.EVALUATING]: "Evaluating",
-  [ModelStages.VISUALIZING]: "Visualizing",
-  [ModelStages.PREDICTING]: "Predicting",
-  [ModelStages.RESULTS]: "Results",
+  [ModelStages.PARAMETERS]: "Configuration",
+  [ModelStages.TRAINING]: "Model Training",
+  [ModelStages.EVALUATING]: "Performance Analysis",
+  [ModelStages.VISUALIZING]: "Data Visualization",
+  [ModelStages.PREDICTING]: "Making Predictions",
+  [ModelStages.RESULTS]: "Final Results",
 };
 
 export const STAGE_TRANSITIONS: Record<ModelStages, ModelStages> = {

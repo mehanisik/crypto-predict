@@ -1,3 +1,22 @@
+--- UPDATE 30.08.2025 ---
+
+I have decided to take a deep dive into the code and make some changes to the code 
+especially the machine learnin models and the development process.I believe that there is 
+a a lot of room for improvement as i have been studying the machine learning models and the development process.For now , i will focus on the critical issues that i will address in this code.
+
+- [X] Data source replaced with another public API  which is offers more features compared to the 
+yfinance api ( Polygon.io)
+- [ ] Model Optimizations (Hybrid models)
+- [ ] Data pipeline optimization for better data handling and analysis
+- [ ] Refactor the code for better and cleaner way (removing unnecessary code and simplifying the code)
+
+
+
+- [ ] Adding the better error handling and re conncetion logic for the websocket connection to the client side
+- [ ] Minimalistic UI/UX design for the client side with better detailed steppers for the machine learning process
+- [ ] Writing the tests for the client side
+
+
 # Cryptocurrency Price Prediction System
 
 ![Python](https://img.shields.io/badge/Python-3.9+-black)

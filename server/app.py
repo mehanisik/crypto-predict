@@ -2,7 +2,6 @@ from flask import Flask, jsonify, request
 from flask_socketio import SocketIO
 import structlog
 from datetime import datetime, timedelta
-import redis
 from flask_cors import CORS
 import os
 
@@ -27,13 +26,10 @@ CORS(app, resources={
     }
 })
 
-redis_url = os.getenv('REDIS_URL', 'redis://redis:6379/0')
-redis_client = redis.from_url(redis_url)
-
+# Simplified SocketIO without Redis
 socketio = SocketIO(
     app,
     cors_allowed_origins=os.getenv('CORS_ORIGINS', '*'),
-    message_queue=redis_url,
     async_mode='eventlet'
 )
 
@@ -156,8 +152,8 @@ def train_model():
                 predictor = CryptoPredictor(config, websocket_manager)
                 result = predictor.train(
                     validated_data.ticker,
-                    validated_data.start_date.isoformat(),
-                    validated_data.end_date.isoformat()
+                    validated_data.start_date,
+                    validated_data.end_date
                 )
                 
                 log.info("training_successful", ticker=validated_data.ticker)
