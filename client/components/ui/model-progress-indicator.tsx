@@ -10,8 +10,7 @@ import {
   Target, 
   CheckCircle, 
   Clock,
-  Play,
-  Pause
+  Play
 } from "lucide-react";
 import { useModelSocket } from "@/hooks/use-socket";
 import { ModelStages, MODEL_STAGE_LABELS } from "@/constants/model-stages.constant";
@@ -162,7 +161,7 @@ export function ModelProgressIndicator({ className = "", showDetails = false }: 
                       {getStageIcon(stage)}
                       <span className="text-sm">{MODEL_STAGE_LABELS[stage]}</span>
                       {isCurrent && (
-                        <Badge variant="outline" size="sm" className="bg-blue-100 text-blue-800">
+                        <Badge variant="outline" className="bg-blue-100 text-blue-800">
                           Active
                         </Badge>
                       )}
@@ -175,7 +174,6 @@ export function ModelProgressIndicator({ className = "", showDetails = false }: 
                   <Progress 
                     value={progress} 
                     className="h-1.5" 
-                    variant={isCurrent ? "default" : "secondary"}
                   />
                 </div>
               );

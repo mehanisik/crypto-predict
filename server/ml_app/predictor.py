@@ -44,9 +44,9 @@ class CryptoPredictor:
                            start_date=start_date, 
                            end_date=end_date)
 
-            # Prepare data
+            # Prepare data with multiple features
             (X_train, y_train), (X_test, y_test), original_prices = \
-                self.data_processor.fetch_and_prepare_data(ticker_symbol, start_date, end_date)
+                self.data_processor.fetch_and_prepare_data(ticker_symbol, start_date, end_date, use_multiple_features=True)
 
             # WebSocket callback for real-time updates
             class WSCallback(tf.keras.callbacks.Callback):
@@ -121,7 +121,26 @@ class CryptoPredictor:
             else:
                 raise ValueError(f"Invalid model: {self.config.model}")
             
-            self.model = model_builder.build((self.config.lookback, 1))
+            # Determine input shape based on features
+            if hasattr(self.data_processor, 'df') and self.data_processor.df is not None:
+                # Use actual number of features from data
+                num_features = len(self.data_processor.df.columns)
+                input_shape = (self.config.lookback, num_features)
+            else:
+                # Default to 5 features (OHLCV)
+                input_shape = (self.config.lookback, 5)
+            
+            self.model = model_builder.build(input_shape)
+            
+            # Add early stopping callback
+            from tensorflow.keras.callbacks import EarlyStopping
+            
+            early_stopping = EarlyStopping(
+                monitor='val_loss',
+                patience=self.config.early_stopping_patience,
+                restore_best_weights=True,
+                verbose=0
+            )
             
             # Train model
             history = self.model.fit(
@@ -130,7 +149,7 @@ class CryptoPredictor:
                 epochs=self.config.epochs,
                 batch_size=self.config.batch_size,
                 verbose=0,  # Disable default progress bar
-                callbacks=[WSCallback(self)]
+                callbacks=[WSCallback(self), early_stopping]
             )
 
             # Generate and validate predictions

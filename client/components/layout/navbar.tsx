@@ -1,11 +1,10 @@
 "use client";
 
 import { ThemeToggle } from "../theme/theme-toggle";
-import { ConnectionStatus } from "../ui/connection-status";
-import { useModelSocket } from "@/hooks/use-socket";
+import { useWebSocket } from "@/lib/websocket";
 
 export function Navbar() {
-  const { isConnected, error } = useModelSocket();
+  const { isConnected, error } = useWebSocket();
 
   return (
     <nav className="border-b h-14">

@@ -13,10 +13,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { useModelSocket } from "@/hooks/use-socket";
+import { useWebSocket } from "@/lib/websocket";
 import { useConnectionHealth } from "@/hooks/use-connection-health";
 import { useMutation } from "@tanstack/react-query";
-import { FormParams } from "@/types/form-params";
+import * as z from "zod";
+import trainingSchema from "@/schemas/model-training";
 import {
   MODEL_STAGE_LABELS,
   ModelStages,
@@ -31,10 +32,7 @@ import { PredictionResponse } from "@/types/prediction";
 import { ResultsCard } from "../ui/results-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-type SelectedParams = {
-  modelType: string;
-  ticker: string;
-} | null;
+type TrainingFormData = z.infer<typeof trainingSchema>;
 
 export default function MachineLearningWidget() {
   const {
@@ -46,12 +44,11 @@ export default function MachineLearningWidget() {
     resetState,
     setCurrentStage,
     isStageComplete,
-  } = useModelSocket();
+  } = useWebSocket();
 
   const { health } = useConnectionHealth();
 
   const [activeTab, setActiveTab] = useState<string>(currentStage.toString());
-  const [selectedParams, setSelectedParams] = useState<SelectedParams>(null);
   const [predictionsData, setPredictionsData] = useState<PredictionResponse>();
 
   useEffect(() => {
@@ -63,28 +60,18 @@ export default function MachineLearningWidget() {
   };
 
   const { mutate, isPending } = useMutation({
-    mutationFn: async (data: FormParams) => {
-      console.log('Starting training with data:', data);
-      setSelectedParams({
-        modelType: data.modelType,
+    mutationFn: async (data: TrainingFormData) => {
+      const response = await server.post("/train", {
         ticker: data.ticker,
+        model_type: data.modelType,
+        start_date: data.startDate,
+        end_date: data.endDate,
+        lookback: data.lookback,
+        epochs: data.epochs,
+        batch_size: data.batchSize,
+        learning_rate: data.learningRate,
       });
-      
-      try {
-        const response = await server.post("/train", {
-          ticker: data.ticker,
-          start_date: data.startDate,
-          end_date: data.endDate,
-          lookback: data.lookback,
-          epochs: data.epochs,
-          model: data.modelType,
-        });
-        console.log('Training response:', response.data);
-        return response.data;
-      } catch (error) {
-        console.error('Training error:', error);
-        throw error;
-      }
+      return response.data;
     },
     onSuccess: (data) => {
       console.log('Training started successfully:', data);
@@ -92,10 +79,11 @@ export default function MachineLearningWidget() {
       // Show success message
       alert('Training started successfully! Check the training tab for progress.');
     },
-    onError: (error: any) => {
+    onError: (error: Error | unknown) => {
       console.error('Training failed:', error);
       // Show error message to user
-      const errorMessage = error?.response?.data?.message || error?.message || 'Training failed. Please try again.';
+      const errorMessage = error instanceof Error ? error.message : 
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Training failed. Please try again.';
       alert(`Training failed: ${errorMessage}`);
     },
   });
@@ -340,13 +328,15 @@ export default function MachineLearningWidget() {
                 <CardContent className="space-y-4">
                   <div className="bg-white/80 dark:bg-gray-800/80 rounded-lg p-4 border border-red-200/30 dark:border-red-700/30">
                     {/* Type assertion needed due to TypeScript inference limitations with the error object */}
-                    <p className="text-sm text-red-700 dark:text-red-300 mb-3">{(error as any).message}</p>
+                    <p className="text-sm text-red-700 dark:text-red-300 mb-3">
+                      {(error as Error).message || 'Unknown error occurred'}
+                    </p>
                     <div className="flex items-center gap-3">
                       <Badge variant="outline" className="text-xs border-red-300 dark:border-red-600 text-red-700 dark:text-red-300">
-                        {(error as any).retryable ? 'Retryable' : 'Non-retryable'}
+                        {(error as { retryable?: boolean }).retryable ? 'Retryable' : 'Non-retryable'}
                       </Badge>
                       <span className="text-xs text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50 px-2 py-1 rounded">
-                        {(error as any).timestamp.toLocaleTimeString()}
+                        {(error as { timestamp?: Date }).timestamp?.toLocaleTimeString() || 'Unknown time'}
                       </span>
                     </div>
                   </div>
@@ -402,17 +392,6 @@ export default function MachineLearningWidget() {
               </TabsList>
 
               <div className="mt-4 rounded-lg border bg-card p-4 flex-1 overflow-hidden">
-                {selectedParams && currentStage !== ModelStages.PARAMETERS && (
-                  <div className="mb-4 flex gap-2">
-                    <Badge variant="outline">
-                      Model: {selectedParams.modelType}
-                    </Badge>
-                    <Badge variant="outline">
-                      Ticker: {selectedParams.ticker}
-                    </Badge>
-                  </div>
-                )}
-
                 <div className="overflow-hidden">
                   <TabsContent
                     value={ModelStages.PARAMETERS.toString()}

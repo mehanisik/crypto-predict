@@ -18,6 +18,7 @@ const trainingSchema = z.object({
   lookback: z.number().min(1).max(60).default(8),
   epochs: z.number().min(1).max(1000).default(100),
   batchSize: z.number().min(1).max(1000).default(32),
+  learningRate: z.number().min(0.0001).max(0.1).default(0.001),
 });
 
 export default trainingSchema;

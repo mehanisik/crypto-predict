@@ -1,27 +1,150 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  ml-server:
+  # Main application
+  app:
     build: .
-    container_name: crypto-predictor-server
+    command: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:5000 run:app
     ports:
       - "5000:5000"
-    volumes:
-      - ./models:/app/models
-      - ./logs:/app/logs
     environment:
-      - FLASK_APP=app.py
+      - EVENTLET_NO_GREENDNS=yes
       - FLASK_ENV=production
-      - PYTHONUNBUFFERED=1
-      - CORS_ORIGINS=*
-      - POLYGON_API_KEY=${POLYGON_API_KEY}
+      - DATABASE_URL=postgresql://neondb_owner:npg_hFgzYBLtA5x8@ep-tiny-paper-afkuw2th-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require
+      - REDIS_URL=redis://redis:6379/0
+      - BROKER_URL=redis://redis:6379/1
+      - RESULT_BACKEND=redis://redis:6379/2
+      - RATELIMIT_STORAGE_URL=redis://redis:6379/3
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./logs:/app/logs
+      - ./models:/app/models
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    networks:
+      - crypto-network
+
+  # Celery worker for background tasks
+  celery:
+    build: .
+    command: celery -A app.celery:celery worker --loglevel=info
+    environment:
+      - EVENTLET_NO_GREENDNS=yes
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://neondb_owner:npg_hFgzYBLtA5x8@ep-tiny-paper-afkuw2th-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require
+      - REDIS_URL=redis://redis:6379/0
+      - BROKER_URL=redis://redis:6379/1
+      - RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./logs:/app/logs
+      - ./models:/app/models
+    restart: unless-stopped
+    networks:
+      - crypto-network
+
+  # Celery beat for scheduled tasks
+  celery-beat:
+    build: .
+    command: celery -A app.celery:celery beat --loglevel=info
+    environment:
+      - EVENTLET_NO_GREENDNS=yes
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://neondb_owner:npg_hFgzYBLtA5x8@ep-tiny-paper-afkuw2th-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require
+      - REDIS_URL=redis://redis:6379/0
+      - BROKER_URL=redis://redis:6379/1
+      - RESULT_BACKEND=redis://redis:6379/2
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - crypto-network
+
+  # Redis for caching and message broker
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - crypto-network
+
+  # PostgreSQL database
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=crypto_predict
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    networks:
+      - crypto-network
+
+  # Nginx reverse proxy (optional)
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+    networks:
+      - crypto-network
+
+  # Monitoring with Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - crypto-network
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+    restart: unless-stopped
+    networks:
+      - crypto-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
-  app-network:
+  crypto-network:
     driver: bridge

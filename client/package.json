@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "dev": "bun --bun next dev --turbopack",
+    "build": "bun --bun next build",
+    "start": "bun --bun next start",
+    "lint": "bun --bun next lint",
+    "test": "bun test",
+    "test:watch": "bun test --watch",
+    "test:coverage": "bun test --coverage"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -34,7 +34,7 @@
     "axios": "^1.7.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "date-fns": "^4.1.0",
+    "date-fns": "^3.6.0",
     "embla-carousel-react": "^8.5.2",
     "lucide-react": "^0.469.0",
     "next": "15.1.2",
@@ -42,7 +42,7 @@
     "plotly.js": "^2.35.3",
     "plotly.js-dist-min": "^2.35.3",
     "react": "^19.0.0",
-    "react-day-picker": "8.10.1",
+    "react-day-picker": "^9.4.1",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.2",
     "react-plotly.js": "^2.6.0",

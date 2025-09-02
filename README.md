@@ -1,161 +1,205 @@
---- UPDATE 30.08.2025 ---
+--- UPDATE 02.09.2025 ---
 
-I have decided to take a deep dive into the code and make some changes to the code 
-especially the machine learnin models and the development process.I believe that there is 
-a a lot of room for improvement as i have been studying the machine learning models and the development process.For now , i will focus on the critical issues that i will address in this code.
-
-- [X] Data source replaced with another public API  which is offers more features compared to the 
-yfinance api ( Polygon.io)
-- [ ] Model Optimizations (Hybrid models)
-- [ ] Data pipeline optimization for better data handling and analysis
-- [ ] Refactor the code for better and cleaner way (removing unnecessary code and simplifying the code)
+I have completed a comprehensive refactor and improvement of the cryptocurrency prediction system. Here are the key improvements made:
 
 
+### Server-Side Enhancements
+- [X] **Structured Logging**: Replaced all triple-quoted comments and test files with proper `structlog` logging
+- [X] **Database Migration**: Migrated from SQLite to Neon PostgreSQL with proper Alembic migrations
+- [X] **WebSocket Stability**: Fixed persistent Socket.IO connection issues with Redis message queue
+- [X] **Rate Limiting**: Added proper rate limiting with Redis storage and exempted critical endpoints
+- [X] **Monitoring**: Integrated Prometheus metrics exporter for monitoring and observability
+- [X] **Celery Modernization**: Updated to modern Celery configuration keys (removed deprecated settings)
+- [X] **API Validation**: Enhanced Marshmallow schemas with better error handling
+- [X] **Containerization**: Optimized Docker setup with proper service dependencies
 
-- [ ] Adding the better error handling and re conncetion logic for the websocket connection to the client side
-- [ ] Minimalistic UI/UX design for the client side with better detailed steppers for the machine learning process
-- [ ] Writing the tests for the client side
+### Client-Side Improvements
+- [X] **WebSocket Client**: Implemented custom React hook for WebSocket management
+- [X] **Error Handling**: Added comprehensive error handling and reconnection logic
+- [X] **UI/UX**: Cleaned up client codebase and improved component structure
+- [X] **Real-time Updates**: Fixed training progress updates via WebSocket
+- [X] **Package Management**: Migrated to Bun for faster package management
 
+### Machine Learning Enhancements
+- [X] **Model Metrics**: Added comprehensive metrics (R², MAE, RMSE, MAPE) for better model evaluation
+- [X] **Training Pipeline**: Improved training service with proper progress tracking and database persistence
+- [X] **Data Validation**: Enhanced prediction request validation and error handling
 
-# Cryptocurrency Price Prediction System
-
-![Python](https://img.shields.io/badge/Python-3.9+-black)
-![TensorFlow](https://img.shields.io/badge/TensorFlow-2.12+-black)
-![Next.js](https://img.shields.io/badge/Next.js-14.2.3-black)
-![React.js](https://img.shields.io/badge/React.js-19.0.0-black)
-![License](https://img.shields.io/badge/License-MIT-black)
-
-A full-stack system for cryptocurrency price prediction with real-time training monitoring and forecasting capabilities.
-
-## Architecture Overview
-
-### Server Stack (`/server`)
-
-- **Core Framework**: Flask 2.3 + Gunicorn
-- **Machine Learning**: TensorFlow 2.12, Keras
-- **Data Processing**: Pandas, NumPy, yfinance
-- **Real-time Communication**: Flask-SocketIO 5.3, Redis 4.5
-- **Visualization**: Matplotlib, Seaborn
-- **Utilities**: structlog, Pydantic, Joblib
-- **Containerization**: Docker, docker-compose
-
-### Client Stack (`/client`)
-
-- **Framework**: Next.js 15 (App Router)
-- **UI Components**: Shadcn UI
-- **Visualization**: Recharts
-- **Styling**: Tailwind CSS + CSS Modules
-- **API Client**: Axios
-- **WebSocket Communication**: Socket.IO Client
-- **Form Handling**: React Hook Form
-- **Type Safety**: TypeScript 5.3
-
-## System Features
+## 🚀 Current Features
 
 ### Server Capabilities
-
-- Model training pipeline supporting CNN, LSTM, CNN-LSTM, and LSTM-CNN architectures
-- Real-time WebSocket updates during training
-- Historical price data fetching from Yahoo Finance
-- Model persistence and versioning
-- Prediction API with confidence intervals
-- Comprehensive training metrics (MAE, RMSE, R²)
+- **4 ML Models**: CNN, LSTM, CNN-LSTM, and LSTM-CNN architectures
+- **Real-time Training**: WebSocket updates during model training with progress tracking
+- **Database Integration**: Neon PostgreSQL with proper migrations and data persistence
+- **API Endpoints**: Health checks, predictions, training management, and metrics
+- **Monitoring**: Prometheus metrics for observability and Grafana dashboards
+- **Background Tasks**: Celery workers for async training and processing
+- **Rate Limiting**: Intelligent rate limiting with Redis storage
+- **Structured Logging**: Event-based logging with proper formatting and context
 
 ### Client Features
+- **Real-time Dashboard**: Live training progress and model performance monitoring
+- **Interactive Charts**: Price prediction visualizations with Plotly.js and Recharts
+- **WebSocket Management**: Robust connection handling with automatic reconnection
+- **Responsive Design**: Mobile-first UI with Tailwind CSS and Radix UI components
+- **Type Safety**: Full TypeScript implementation with proper type definitions
+- **Modern Stack**: Next.js 15 with App Router and Bun package manager
 
-- Real-time training progress dashboard
-- Interactive price prediction charts
-- Model configuration interface
-- Historical performance comparison
-- WebSocket connection management
-- Responsive, mobile-first UI
-- Dark/Light theme toggle
+## 🏗️ Architecture Overview
 
-## Development Setup
+### Server Stack (`/server`)
+- **Core Framework**: Flask 2.3.3 + Gunicorn with eventlet workers
+- **Machine Learning**: TensorFlow 2.12, Keras with custom model architectures
+- **Real-time Communication**: Flask-SocketIO 5.3.6 with Redis message queue
+- **Database**: PostgreSQL (Neon) with SQLAlchemy and Alembic migrations
+- **Caching & Message Broker**: Redis 7 for caching, Celery broker, and Socket.IO
+- **Monitoring**: Prometheus metrics exporter with custom labels
+- **Containerization**: Docker Compose with proper service orchestration
+- **Logging**: structlog for structured, event-based logging
+
+### Client Stack (`/client`)
+- **Framework**: Next.js 15 with App Router and TypeScript 5.3
+- **UI Components**: Shadcn UI components with Radix UI primitives
+- **Visualization**: Plotly.js for interactive charts, Recharts for analytics
+- **Styling**: Tailwind CSS with custom design system
+- **WebSocket**: Socket.IO client with custom React hooks
+- **API Client**: Axios with proper error handling and interceptors
+- **Package Manager**: Bun for faster dependency management
+- **Form Handling**: React Hook Form with Zod validation
+
+## 🚀 Quick Start
 
 ### Prerequisites
-
 - Docker 24.0+ and docker-compose
-- Node.js 18.x + npm 9.x
-- Python 3.9+ with pip
+- Node.js 18.x+ (for local development)
+- Bun (recommended for client development)
 
-### Installation
-
+### Running with Docker (Recommended)
 ```bash
+# Clone the repository
 git clone https://github.com/mhanifiisik/crypto-predict.git
 cd crypto-predict
 
+# Start all services
+cd server
+docker-compose up -d
+
+# Access the application
+# Client: http://localhost:3001
+# Server API: http://localhost:5000
+# Grafana: http://localhost:3000 (admin/admin)
+# Prometheus: http://localhost:9090
+```
+
+### Local Development
+```bash
 # Server setup
 cd server
 python -m venv venv
-source venv/bin/activate
+source venv/bin/activate  # or `venv\Scripts\activate` on Windows
 pip install -r requirements.txt
+flask run
 
 # Client setup
 cd ../client
 bun install
+bun dev
 ```
 
-### Running with Docker
+## 📊 API Endpoints
 
-```bash
-docker-compose up --build
-```
+### Core Endpoints
+- `GET /api/v1/health` - Health check with service status
+- `POST /api/v1/predict` - Generate price predictions
+- `POST /api/v1/train` - Start model training
+- `GET /api/v1/train/<session_id>/status` - Training status
+- `DELETE /api/v1/train/<session_id>/cancel` - Cancel training
+- `GET /api/v1/train/running` - List running training sessions
+- `GET /metrics` - Prometheus metrics (exempt from rate limiting)
 
-### Environment Configuration
+### WebSocket Events
+- `connect` / `disconnect` - Connection management
+- `join_training` / `leave_training` - Training room management
+- `join_prediction` / `leave_prediction` - Prediction room management
+- `training_update` - Real-time training progress updates
+- `prediction_update` - Real-time prediction updates
+- `error_update` - Error notifications
 
-#### Server (`.env`)
+## 🔧 Configuration
 
+### Environment Variables
 ```env
-FLASK_ENV=production
+# Database
+DATABASE_URL=postgresql://user:pass@host:port/db
+
+# Redis
 REDIS_URL=redis://redis:6379/0
-MODEL_SAVE_PATH=models/
+BROKER_URL=redis://redis:6379/1
+RESULT_BACKEND=redis://redis:6379/2
+
+# Rate Limiting
+RATELIMIT_STORAGE_URL=redis://redis:6379/3
+
+# Monitoring
+PROMETHEUS_MULTIPROC_DIR=/tmp
 ```
 
-#### Client (`.env.local`)
+## 📈 Monitoring & Observability
 
-```env
-NEXT_PUBLIC_BASE_URL=http://localhost:5000
+### Prometheus Metrics
+- `crypto_predict_flask_http_request_total` - Request counts by status
+- `crypto_predict_flask_http_request_duration_seconds` - Request duration histograms
+- `crypto_predict_flask_info` - Application information
+
+### Grafana Dashboards
+- Real-time request monitoring
+- Response time percentiles
+- Error rate tracking
+- Custom application metrics
+
+## 🧪 Testing
+
+### Server Testing
+```bash
+cd server
+# Run all tests
+python -m pytest
+
+# Test specific endpoints
+curl http://localhost:5000/api/v1/health
+curl http://localhost:5000/metrics
 ```
 
-## Project Structure
-
-```
-├── client/                # Next.js 15 Frontend
-│   ├── app/               # App router
-│   │   ├── dashboard/     # Main dashboard page
-│   │   │   └── page.tsx
-│   │   ├── layout.tsx     # Root layout
-│   │   └── not-found.tsx  # 404 page
-│   ├── components/        # UI Components
-│   │   ├── charts/        # Recharts components
-│   │   ├── training/      # Training progress visuals
-│   │   ├── widgets/       # Dashboard widgets
-│   │   └── ui/            # Shadcn/ui components
-│   ├── hooks/             # Custom hooks
-│   ├── lib/               # Utility functions
-│   │   ├── api.ts         # Axios client
-│   │   └── websocket.ts   # Socket.IO client
-│   ├── schemas/           # Form schemas (Zod)
-│   ├── types/             # TypeScript definitions
-│   ├── styles/            # Tailwind CSS
-│   └── public/            # Static assets
-│
-├── server/                # Flask Backend
-│   ├── ml_app/            # Core ML Logic
-│   │   ├── config.py      # Model configurations
-│   │   ├── predictor.py   # Training pipeline
-│   │   ├── models/        # Model architectures (CNN, LSTM, Hybrid)
-│   │   ├── data/          # Data processing
-│   │   └── visualization/ # Analytical visuals
-│   ├── app.py             # Flask entry point
-│   ├── docker-compose.yml # Redis configuration
-│   ├── Dockerfile
-│   └── requirements.txt   # Python dependencies
-│
-└── optuna/                # Hyperparameter optimization
+### WebSocket Testing
+```bash
+# Use the provided debug script
+cd server
+node websocket-debug.js
 ```
 
-## License
+## 🔍 Troubleshooting
+
+### Common Issues
+1. **WebSocket Connection Errors**: Ensure Redis is running and Socket.IO is properly configured
+2. **Database Connection**: Verify Neon PostgreSQL credentials and SSL settings
+3. **Rate Limiting**: Check Redis connection for rate limiter storage
+4. **Celery Workers**: Monitor Celery logs for task execution issues
+
+### Logs
+```bash
+# View all service logs
+docker-compose logs -f
+
+# View specific service logs
+docker-compose logs -f app
+docker-compose logs -f celery
+docker-compose logs -f redis
+```
+
+## 📝 License
 
 Distributed under the MIT License. See `LICENSE` for more information.
+
+---
+
+**Note**: This system is designed for educational and research purposes. Cryptocurrency predictions should not be used as financial advice.

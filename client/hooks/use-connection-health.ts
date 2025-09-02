@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useModelSocket } from "./use-socket";
+import { useWebSocket } from "@/lib/websocket";
 
 interface ConnectionMetrics {
   uptime: number;
@@ -16,7 +16,7 @@ interface ConnectionMetrics {
 interface ConnectionHealth {
   isHealthy: boolean;
   quality: 'excellent' | 'good' | 'fair' | 'poor';
-  score: number; // 0-100
+  score: number;
   recommendations: string[];
 }
 
@@ -33,12 +33,11 @@ export function useConnectionHealth() {
   const {
     isConnected,
     isConnecting,
-    isReconnecting,
+    error,
     connectionAttempts,
     lastConnectedAt,
     lastDisconnectedAt,
-    error,
-  } = useModelSocket();
+  } = useWebSocket();
 
   const [metrics, setMetrics] = useState<ConnectionMetrics>({
     uptime: 0,
@@ -57,46 +56,38 @@ export function useConnectionHealth() {
     recommendations: [],
   });
 
-  // Refs for tracking
   const connectionStartTimeRef = useRef<number | null>(null);
   const disconnectionStartTimeRef = useRef<number | null>(null);
   const reconnectionStartTimeRef = useRef<number | null>(null);
   const reconnectionTimesRef = useRef<number[]>([]);
 
-  // Calculate connection quality score
   const calculateHealthScore = useCallback((): number => {
     let score = 100;
 
-    // Deduct points for failed connections
     if (metrics.totalConnections > 0 && metrics.failedConnections > 0) {
       const failureRate = metrics.failedConnections / metrics.totalConnections;
-      score -= failureRate * 30; // Up to 30 points for connection failures
+      score -= failureRate * 30;
     }
 
-    // Deduct points for excessive reconnection attempts
     if (connectionAttempts > 0) {
-      score -= Math.min(connectionAttempts * 5, 20); // Up to 20 points for reconnection attempts
+      score -= Math.min(connectionAttempts * 5, 20);
     }
 
-    // Deduct points for long reconnection times
     if (metrics.averageReconnectionTime > 5000) {
-      score -= Math.min((metrics.averageReconnectionTime - 5000) / 1000, 15); // Up to 15 points for slow reconnections
+      score -= Math.min((metrics.averageReconnectionTime - 5000) / 1000, 15);
     }
 
-    // Deduct points for current errors
     if (error) {
       score -= 10;
     }
 
-    // Deduct points for reconnection state
-    if (isReconnecting) {
+    if (isConnecting) {
       score -= 5;
     }
 
     return Math.max(0, Math.round(score));
-  }, [metrics, connectionAttempts, error, isReconnecting]);
+  }, [metrics, connectionAttempts, error, isConnecting]);
 
-  // Determine connection quality
   const getConnectionQuality = useCallback((score: number): 'excellent' | 'good' | 'fair' | 'poor' => {
     if (score >= HEALTH_THRESHOLDS.EXCELLENT) return 'excellent';
     if (score >= HEALTH_THRESHOLDS.GOOD) return 'good';
@@ -104,7 +95,6 @@ export function useConnectionHealth() {
     return 'poor';
   }, []);
 
-  // Generate recommendations
   const generateRecommendations = useCallback((score: number, quality: string): string[] => {
     const recommendations: string[] = [];
 
@@ -131,12 +121,10 @@ export function useConnectionHealth() {
     return recommendations;
   }, [metrics, connectionAttempts, error]);
 
-  // Update metrics when connection state changes
   useEffect(() => {
     const now = Date.now();
 
     if (isConnected && !connectionStartTimeRef.current) {
-      // Connection established
       connectionStartTimeRef.current = now;
       disconnectionStartTimeRef.current = null;
       
@@ -146,7 +134,6 @@ export function useConnectionHealth() {
         successfulConnections: prev.successfulConnections + 1,
       }));
 
-      // Calculate reconnection time if this was a reconnection
       if (reconnectionStartTimeRef.current) {
         const reconnectionTime = now - reconnectionStartTimeRef.current;
         reconnectionTimesRef.current.push(reconnectionTime);
@@ -160,7 +147,6 @@ export function useConnectionHealth() {
         reconnectionStartTimeRef.current = null;
       }
     } else if (!isConnected && connectionStartTimeRef.current) {
-      // Connection lost
       const uptime = now - connectionStartTimeRef.current;
       connectionStartTimeRef.current = null;
       disconnectionStartTimeRef.current = now;
@@ -171,12 +157,11 @@ export function useConnectionHealth() {
       }));
     }
 
-    if (isReconnecting && !reconnectionStartTimeRef.current) {
+    if (isConnecting && !reconnectionStartTimeRef.current) {
       reconnectionStartTimeRef.current = now;
     }
-  }, [isConnected, isReconnecting]);
+  }, [isConnected, isConnecting]);
 
-  // Track failed connections when reconnection attempts are exhausted
   useEffect(() => {
     if (connectionAttempts >= MAX_RECONNECTION_ATTEMPTS && !isConnected) {
       setMetrics(prev => ({
@@ -186,7 +171,6 @@ export function useConnectionHealth() {
     }
   }, [connectionAttempts, isConnected]);
 
-  // Update health when metrics change
   useEffect(() => {
     const score = calculateHealthScore();
     const quality = getConnectionQuality(score);
@@ -198,18 +182,14 @@ export function useConnectionHealth() {
       score,
       recommendations,
     });
-  }, [metrics, connectionAttempts, error, isReconnecting, calculateHealthScore, getConnectionQuality, generateRecommendations]);
+  }, [metrics, connectionAttempts, error, isConnecting, calculateHealthScore, getConnectionQuality, generateRecommendations]);
 
-  // Update downtime when disconnected
   useEffect(() => {
     if (!isConnected && disconnectionStartTimeRef.current) {
       const interval = setInterval(() => {
-        const now = Date.now();
-        const downtime = now - disconnectionStartTimeRef.current!;
-        
         setMetrics(prev => ({
           ...prev,
-          downtime: prev.downtime + 1000, // Add 1 second
+          downtime: prev.downtime + 1000,
         }));
       }, 1000);
 
@@ -217,14 +197,12 @@ export function useConnectionHealth() {
     }
   }, [isConnected]);
 
-  // Calculate uptime percentage
   const getUptimePercentage = useCallback((): number => {
     const total = metrics.uptime + metrics.downtime;
     if (total === 0) return 100;
     return Math.round((metrics.uptime / total) * 100);
   }, [metrics.uptime, metrics.downtime]);
 
-  // Reset metrics
   const resetMetrics = useCallback(() => {
     setMetrics({
       uptime: 0,

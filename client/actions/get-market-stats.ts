@@ -1,4 +1,4 @@
-import { CryptoData, MarketData } from "@/types/crypto";
+import { CryptoData, MarketData } from "@/lib/crypto";
 import axios from "axios";
 
 export const getMarketStats = async (): Promise<MarketData[]> => {
