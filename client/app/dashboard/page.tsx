@@ -1,13 +1,27 @@
-import CryptoDashboard from "@/components/features/dashboard";
-import { Metadata } from "next";
+import { AppSidebar } from "@/components/layout/app-sidebar";
+import { SiteHeader } from "@/components/layout/site-header";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
-export const metadata: Metadata = {
-  title: "Dashboard - CryptoPredict",
-  description: "AI-Powered Cryptocurrency Predictions Dashboard with real-time WebSocket updates",
-};
+import MarketOverviewWidget from "@/components/widgets/market-overview";
+import MachineLearningWidget from "@/components/widgets/ml-model";
+import LiveChartWidget from "@/components/widgets/technical-analysis";
 
-const Dashboard = () => {
-  return <CryptoDashboard />;
-};
-
-export default Dashboard;
+export default function Page() {
+  return (
+    <SidebarProvider>
+      <AppSidebar variant="inset" />
+      <SidebarInset>
+        <SiteHeader />
+        <div className="grid grid-cols-2 grid-rows-2  gap-4  p-4">
+            <MarketOverviewWidget />
+          <div className="row-span-2 col-start-2 row-start-1">
+          <MachineLearningWidget />
+          </div>
+          <div className="col-start-1 row-start-2">
+            <LiveChartWidget />
+          </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}

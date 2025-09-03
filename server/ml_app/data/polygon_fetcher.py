@@ -1,10 +1,10 @@
-import pandas as pd
-import numpy as np
+import pandas as pd  # type: ignore
+import numpy as np  # type: ignore
 from datetime import datetime, timedelta
 from typing import Optional, Tuple
 import structlog
 import os
-from polygon import RESTClient
+from polygon import RESTClient  # type: ignore
 
 logger = structlog.get_logger(__name__)
 
@@ -18,8 +18,13 @@ class PolygonDataFetcher:
         if not self.api_key:
             raise ValueError("Polygon API key is required. Set POLYGON_API_KEY environment variable.")
         
+        # Create REST client
         self.client = RESTClient(self.api_key)
         self.logger = structlog.get_logger(__name__)
+    
+    def __del__(self):
+        """Cleanup method"""
+        pass
     
     def fetch_historical_data(self, ticker: str, start_date: str, end_date: str) -> pd.DataFrame:
         """
@@ -34,7 +39,16 @@ class PolygonDataFetcher:
             DataFrame with OHLCV data
         """
         try:
-            self.logger.info("fetching_polygon_data", ticker=ticker, start_date=start_date, end_date=end_date)
+            # Normalize crypto tickers like BTC-USD -> X:BTCUSD for Polygon
+            normalized_ticker = ticker
+            if '-' in ticker and ticker.upper().endswith('-USD'):
+                try:
+                    base, quote = ticker.split('-')
+                    normalized_ticker = f"X:{base.upper()}{quote.upper()}"
+                except Exception:
+                    normalized_ticker = ticker
+
+            self.logger.info("fetching_polygon_data", ticker=normalized_ticker, start_date=start_date, end_date=end_date)
             
             # Convert dates to datetime objects
             start_dt = datetime.strptime(start_date, '%Y-%m-%d')
@@ -42,7 +56,7 @@ class PolygonDataFetcher:
             
             # Fetch data from Polygon - using daily data (multiplier=1, timespan=day)
             aggs = self.client.get_aggs(
-                ticker=ticker,
+                ticker=normalized_ticker,
                 multiplier=1,
                 timespan='day',
                 from_=start_dt.strftime('%Y-%m-%d'),
@@ -53,7 +67,7 @@ class PolygonDataFetcher:
             )
             
             if not aggs:
-                raise ValueError(f"No data returned for ticker {ticker}")
+                raise ValueError(f"No data returned for ticker {normalized_ticker}")
             
             # Convert to DataFrame
             data = []

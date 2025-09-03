@@ -1,8 +1,11 @@
-from flask import current_app
+from flask import current_app, request
 from flask_socketio import emit, join_room, leave_room
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+# Track which clients are in which rooms
+client_rooms = {}
 
 
 def handle_connect():
@@ -13,18 +16,39 @@ def handle_connect():
 
 def handle_disconnect():
     """Handle client disconnection."""
+    client_id = request.sid
+    if client_id in client_rooms:
+        # Clean up room tracking for this client
+        del client_rooms[client_id]
     logger.info("websocket_disconnected")
 
 
 def handle_join_training(data):
     """Handle joining a training room."""
     session_id = data.get('session_id')
+    client_id = request.sid
+    
     if not session_id:
         emit('error_update', {'message': 'Session ID required'})
         return
-    join_room(f'training_{session_id}')
-    logger.info("joined_training_room", session_id=session_id)
+    
+    room_name = f'training_{session_id}'
+    
+    # Check if client is already in this room
+    if client_id in client_rooms and room_name in client_rooms[client_id]:
+        logger.info("already_in_training_room", session_id=session_id, client_id=client_id)
+        return
+    
+    join_room(room_name)
+    
+    # Track room membership
+    if client_id not in client_rooms:
+        client_rooms[client_id] = set()
+    client_rooms[client_id].add(room_name)
+    
+    logger.info("joined_training_room", session_id=session_id, client_id=client_id)
     emit('joined_training', {'session_id': session_id, 'status': 'joined'})
+    
     # Immediate snapshot to the joining client (no room) so they see something instantly
     emit('training_update', {
         'session_id': session_id,
@@ -37,33 +61,71 @@ def handle_join_training(data):
 def handle_leave_training(data):
     """Handle leaving a training room."""
     session_id = data.get('session_id')
+    client_id = request.sid
+    
     if not session_id:
         emit('error_update', {'message': 'Session ID required'})
         return
-    leave_room(f'training_{session_id}')
-    logger.info("left_training_room", session_id=session_id)
+    
+    room_name = f'training_{session_id}'
+    leave_room(room_name)
+    
+    # Remove from tracking
+    if client_id in client_rooms and room_name in client_rooms[client_id]:
+        client_rooms[client_id].remove(room_name)
+        if not client_rooms[client_id]:  # If no more rooms, remove client entry
+            del client_rooms[client_id]
+    
+    logger.info("left_training_room", session_id=session_id, client_id=client_id)
     emit('left_training', {'session_id': session_id, 'status': 'left'})
 
 
 def handle_join_prediction(data):
     """Handle joining a prediction room."""
     request_id = data.get('request_id')
+    client_id = request.sid
+    
     if not request_id:
         emit('error_update', {'message': 'Request ID required'})
         return
-    join_room(f'prediction_{request_id}')
-    logger.info("joined_prediction_room", request_id=request_id)
+    
+    room_name = f'prediction_{request_id}'
+    
+    # Check if client is already in this room
+    if client_id in client_rooms and room_name in client_rooms[client_id]:
+        logger.info("already_in_prediction_room", request_id=request_id, client_id=client_id)
+        return
+    
+    join_room(room_name)
+    
+    # Track room membership
+    if client_id not in client_rooms:
+        client_rooms[client_id] = set()
+    client_rooms[client_id].add(room_name)
+    
+    logger.info("joined_prediction_room", request_id=request_id, client_id=client_id)
     emit('joined_prediction', {'request_id': request_id, 'status': 'joined'})
 
 
 def handle_leave_prediction(data):
     """Handle leaving a prediction room."""
     request_id = data.get('request_id')
+    client_id = request.sid
+    
     if not request_id:
         emit('error_update', {'message': 'Request ID required'})
         return
-    leave_room(f'prediction_{request_id}')
-    logger.info("left_prediction_room", request_id=request_id)
+    
+    room_name = f'prediction_{request_id}'
+    leave_room(room_name)
+    
+    # Remove from tracking
+    if client_id in client_rooms and room_name in client_rooms[client_id]:
+        client_rooms[client_id].remove(room_name)
+        if not client_rooms[client_id]:  # If no more rooms, remove client entry
+            del client_rooms[client_id]
+    
+    logger.info("left_prediction_room", request_id=request_id, client_id=client_id)
     emit('left_prediction', {'request_id': request_id, 'status': 'left'})
 
 

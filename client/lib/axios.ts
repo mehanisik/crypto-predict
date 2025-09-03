@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
 const API_VERSION = 'v1';
 
 const server = axios.create({
@@ -8,15 +8,6 @@ const server = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  timeout: 30000,
-  transformRequest: [
-    (data) => {
-      if (data) {
-        return JSON.stringify(data);
-      }
-      return data;
-    },
-  ],
 });
 
 server.interceptors.request.use(
@@ -36,17 +27,7 @@ server.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response) {
-      console.error('❌ API Error:', {
-        status: error.response.status,
-        data: error.response.data,
-        url: error.config?.url
-      });
-    } else if (error.request) {
-      console.error('❌ Network Error: No response received');
-    } else {
-      console.error('❌ Request Error:', error.message);
-    }
+    console.error('❌ Response Error:', error.response?.status, error.config?.url);
     return Promise.reject(error);
   }
 );

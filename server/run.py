@@ -1,5 +1,7 @@
 import os
 import sys
+import signal
+import atexit
 
 # Monkey patching for eventlet (must be done before any other imports)
 import eventlet
@@ -33,6 +35,28 @@ except Exception as e:
     print(f"❌ Flask app creation error: {e}")
     sys.exit(1)
 
+def cleanup_resources():
+    """Cleanup function to close connections and sessions"""
+    try:
+        # Close any global sessions
+        from utils.helpers import _session
+        if _session is not None:
+            _session.close()
+            print("✅ Closed global HTTP session")
+    except Exception as e:
+        print(f"⚠️ Cleanup warning: {e}")
+
+def signal_handler(signum, frame):
+    """Handle shutdown signals gracefully"""
+    print(f"🛑 Received signal {signum}, shutting down gracefully...")
+    cleanup_resources()
+    sys.exit(0)
+
+# Register cleanup handlers
+atexit.register(cleanup_resources)
+signal.signal(signal.SIGTERM, signal_handler)
+signal.signal(signal.SIGINT, signal_handler)
+
 if __name__ == '__main__':
     print("🚀 Starting server...")
     logger.info("starting_crypto_prediction_api")
@@ -47,4 +71,5 @@ if __name__ == '__main__':
         )
     except Exception as e:
         print(f"❌ Server startup error: {e}")
+        cleanup_resources()
         sys.exit(1)

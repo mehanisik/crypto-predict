@@ -20,12 +20,15 @@ export default function MarketOverviewWidget() {
   const { data } = useQuery({
     queryKey: ["market-data"],
     queryFn: getMarketStats,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000,   // 10 minutes (formerly cacheTime)
+ 
   });
 
   return (
     <Widget title="Market Overview">
-      <div className="h-full flex flex-col">
-        <div className="flex-1 overflow-hidden rounded-lg border">
+      <div className="max-h-[35vh] flex flex-col overflow-hidden">
+        <div className="flex-1 overflow-auto rounded-lg border">
           <Table className="h-full">
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>

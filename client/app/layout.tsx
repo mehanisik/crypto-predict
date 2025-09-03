@@ -1,7 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import Navbar from "@/components/layout/navbar";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import QueryProvider from "@/components/providers/query-provider";
@@ -48,7 +47,6 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <QueryProvider>
-            <Navbar />
             <main className="flex-1 h-[calc(100vh-4rem)] overflow-hidden">
               {children}
             </main>

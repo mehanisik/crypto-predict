@@ -16,7 +16,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Loader2 } from "lucide-react";
+import { Loader2, Wifi, WifiOff } from "lucide-react";
 import trainingSchema from "@/schemas/model-training";
 import {
   Select,
@@ -27,6 +27,9 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrainingProgress } from "@/components/ui/training-progress";
+import { useWebSocket } from "@/lib/websocket";
+import { Badge } from "@/components/ui/badge";
 
 interface ModelTrainingFormProps {
   onStartTraining: (data: z.infer<typeof trainingSchema>) => void;
@@ -40,7 +43,7 @@ const PRESET_CONFIGS = {
     ticker: "ETH-USD",
     modelType: "CNN",
     batchSize: 32,
-    lookback: 5,
+    lookback: 10,
     epochs: 10,
     startDate: "2023-01-01",
     endDate: "2023-06-01",
@@ -70,6 +73,7 @@ export function ModelTrainingForm({
   isTraining,
 }: ModelTrainingFormProps) {
   const [activeView, setActiveView] = useState<FormView>("basic");
+  const { isConnected, isConnecting, error, reconnect } = useWebSocket();
   
   const form = useForm<z.infer<typeof trainingSchema>>({
     resolver: zodResolver(trainingSchema),
@@ -77,7 +81,7 @@ export function ModelTrainingForm({
       ticker: "ETH-USD",
       modelType: "CNN-LSTM",
       batchSize: 64,
-      lookback: 8,
+      lookback: 10,
       epochs: 100,
       startDate: "2020-01-01",
       endDate: new Date().toISOString().split("T")[0],
@@ -92,18 +96,69 @@ export function ModelTrainingForm({
     });
   };
 
-  const handleSubmit = (data: z.infer<typeof trainingSchema>) => {
+  const handleSubmit = async (data: z.infer<typeof trainingSchema>) => {
     console.log('Form submitted with data:', data);
     onStartTraining(data);
   };
 
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+
+  const handleTrainingComplete = (results: unknown) => {
+    console.log('Training completed:', results);
+    setActiveSessionId(null);
+  };
+
+  const handleTrainingError = (error: string) => {
+    console.error('Training error:', error);
+    setActiveSessionId(null);
+  };
+
+  // Connection status component
+  const ConnectionStatus = () => (
+    <div className="flex items-center gap-2 mb-4 p-3 rounded-lg border bg-background/50">
+      {isConnected ? (
+        <Wifi className="h-4 w-4 text-green-500" />
+      ) : (
+        <WifiOff className="h-4 w-4 text-red-500" />
+      )}
+      <span className="text-sm font-medium">
+        {isConnected ? 'Connected' : 'Disconnected'}
+      </span>
+      {isConnecting && (
+        <Badge variant="secondary" className="text-xs">
+          Connecting...
+        </Badge>
+      )}
+      {error && (
+        <Badge variant="destructive" className="text-xs">
+          {error}
+        </Badge>
+      )}
+      {!isConnected && !isConnecting && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={reconnect}
+          className="ml-auto"
+        >
+          Reconnect
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
-      {/* Toggle Group for Form Views */}
+      {/* Connection Status */}
+      <ConnectionStatus />
+
+      {/* Preset Configuration */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Configuration Mode</CardTitle>
-          <CardDescription>Choose how you want to configure your model</CardDescription>
+          <CardTitle className="text-lg">Quick Start</CardTitle>
+          <CardDescription>
+            Choose a preset configuration or customize your own
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <ToggleGroup
@@ -112,86 +167,69 @@ export function ModelTrainingForm({
             onValueChange={(value) => value && setActiveView(value as FormView)}
             className="justify-start"
           >
-            <ToggleGroupItem value="basic" className="px-6">
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-                Basic
-              </div>
+            <ToggleGroupItem value="basic" aria-label="Basic">
+              Basic
             </ToggleGroupItem>
-            <ToggleGroupItem value="advanced" className="px-6">
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                Advanced
-              </div>
+            <ToggleGroupItem value="advanced" aria-label="Advanced">
+              Advanced
             </ToggleGroupItem>
-            <ToggleGroupItem value="presets" className="px-6">
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-                Presets
-              </div>
+            <ToggleGroupItem value="presets" aria-label="Presets">
+              Presets
             </ToggleGroupItem>
           </ToggleGroup>
+
+          {activeView === "presets" && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <Button
+                variant="outline"
+                onClick={() => applyPreset("quick-test")}
+                className="h-auto p-4 flex-col items-start"
+              >
+                <div className="font-semibold">Quick Test</div>
+                <div className="text-xs text-muted-foreground">
+                  Fast training for testing
+                </div>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => applyPreset("production")}
+                className="h-auto p-4 flex-col items-start"
+              >
+                <div className="font-semibold">Production</div>
+                <div className="text-xs text-muted-foreground">
+                  Optimized for production
+                </div>
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => applyPreset("experimental")}
+                className="h-auto p-4 flex-col items-start"
+              >
+                <div className="font-semibold">Experimental</div>
+                <div className="text-xs text-muted-foreground">
+                  Advanced configurations
+                </div>
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Preset Configuration Cards */}
-      {activeView === "presets" && (
+      {/* Training Progress */}
+      {activeSessionId && (
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Quick Configuration Presets</CardTitle>
-            <CardDescription>Choose from pre-configured settings for different use cases</CardDescription>
+            <CardTitle className="text-lg">Training Progress</CardTitle>
+            <CardDescription>
+              Real-time training updates
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-3">
-              <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => applyPreset("quick-test")}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Quick Test</CardTitle>
-                  <CardDescription className="text-sm">Fast training for testing</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="text-xs text-muted-foreground space-y-1">
-                    <div>• CNN model, 10 epochs</div>
-                    <div>• 5-day lookback</div>
-                    <div>• Small dataset (6 months)</div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => applyPreset("production")}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Production</CardTitle>
-                  <CardDescription className="text-sm">Full training for production</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="text-xs text-muted-foreground space-y-1">
-                    <div>• CNN-LSTM model, 200 epochs</div>
-                    <div>• 30-day lookback</div>
-                    <div>• Large dataset (3+ years)</div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => applyPreset("experimental")}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Experimental</CardTitle>
-                  <CardDescription className="text-sm">Advanced model testing</CardDescription>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="text-xs text-muted-foreground space-y-1">
-                    <div>• LSTM-CNN model, 150 epochs</div>
-                    <div>• 15-day lookback</div>
-                    <div>• Medium dataset (2 years)</div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <TrainingProgress
+              sessionId={activeSessionId}
+              onComplete={handleTrainingComplete}
+              onError={handleTrainingError}
+            />
           </CardContent>
         </Card>
       )}
@@ -238,20 +276,73 @@ export function ModelTrainingForm({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Model Type</FormLabel>
-                      <FormControl>
-                        <Select value={field.value} onValueChange={field.onChange}>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select model type" />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="CNN-LSTM">CNN-LSTM</SelectItem>
-                            <SelectItem value="LSTM-CNN">LSTM-CNN</SelectItem>
-                            <SelectItem value="CNN">CNN</SelectItem>
-                            <SelectItem value="LSTM">LSTM</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="CNN">CNN</SelectItem>
+                          <SelectItem value="LSTM">LSTM</SelectItem>
+                          <SelectItem value="CNN-LSTM">CNN-LSTM</SelectItem>
+                          <SelectItem value="LSTM-CNN">LSTM-CNN</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>
+                        Choose the neural network architecture
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
                       </FormControl>
-                      <FormDescription>Choose model architecture</FormDescription>
+                      <FormDescription>
+                        Training data start date
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Training data end date
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="lookback"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lookback Days</FormLabel>
+                      <FormControl>
+                        <Input type="number" min="10" max="365" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Number of days to look back (10-365)
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -264,13 +355,11 @@ export function ModelTrainingForm({
                     <FormItem>
                       <FormLabel>Epochs</FormLabel>
                       <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                        />
+                        <Input type="number" min="1" max="1000" {...field} />
                       </FormControl>
-                      <FormDescription>Training epochs (1-1000)</FormDescription>
+                      <FormDescription>
+                        Number of training epochs (1-1000)
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -280,58 +369,15 @@ export function ModelTrainingForm({
                   <>
                     <FormField
                       control={form.control}
-                      name="lookback"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Lookback Period</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="number"
-                              {...field}
-                              onChange={(e) => field.onChange(Number(e.target.value))}
-                            />
-                          </FormControl>
-                          <FormDescription>Days to look back (1-60)</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
                       name="batchSize"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Batch Size</FormLabel>
                           <FormControl>
-                            <Input
-                              type="number"
-                              {...field}
-                              onChange={(e) => field.onChange(Number(e.target.value))}
-                            />
-                          </FormControl>
-                          <FormDescription>Training batch size (1-512)</FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="startDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Start Date</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              pattern="\d{4}-\d{2}-\d{2}"
-                              placeholder="YYYY-MM-DD"
-                              onChange={(e) => field.onChange(e.target.value)}
-                            />
+                            <Input type="number" min="8" max="256" {...field} />
                           </FormControl>
                           <FormDescription>
-                            Start date for training (YYYY-MM-DD)
+                            Training batch size (8-256)
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -340,20 +386,15 @@ export function ModelTrainingForm({
 
                     <FormField
                       control={form.control}
-                      name="endDate"
+                      name="learningRate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>End Date</FormLabel>
+                          <FormLabel>Learning Rate</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
-                              pattern="\d{4}-\d{2}-\d{2}"
-                              placeholder="YYYY-MM-DD"
-                              onChange={(e) => field.onChange(e.target.value)}
-                            />
+                            <Input type="number" step="0.0001" min="0.0001" max="0.1" {...field} />
                           </FormControl>
                           <FormDescription>
-                            End date for training (YYYY-MM-DD)
+                            Learning rate (0.0001-0.1)
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
@@ -366,12 +407,17 @@ export function ModelTrainingForm({
                   <Button
                     type="submit"
                     className="w-full items-center"
-                    disabled={isTraining}
+                    disabled={isTraining || !isConnected}
                   >
                     {isTraining ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Training...
+                      </>
+                    ) : !isConnected ? (
+                      <>
+                        <WifiOff className="mr-2 h-4 w-4" />
+                        Connect to Start Training
                       </>
                     ) : (
                       "Train Model"

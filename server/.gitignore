@@ -78,6 +78,24 @@ celerybeat-schedule
 # dotenv
 .env
 
+# local secrets (if present)
+.secrets
+
+# runtime artifacts
+logs/
+models/
+
+# certificates/keys (never commit)
+ssl/*.key
+ssl/*.crt
+ssl/*.pem
+
+# local databases and dumps
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+
 # virtualenv
 venv/
 ENV/

@@ -1,10 +1,12 @@
 "use client";
 
+import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { ThemeToggle } from "../theme/theme-toggle";
 import { useWebSocket } from "@/lib/websocket";
+import { Button } from "../ui/button";
 
 export function Navbar() {
-  const { isConnected, error } = useWebSocket();
+  const { isConnected, error, reconnect } = useWebSocket();
 
   return (
     <nav className="border-b h-14">
@@ -15,13 +17,28 @@ export function Navbar() {
         
         <div className="ml-auto flex items-center gap-4">
           {/* WebSocket Connection Status */}
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${
-              isConnected ? 'bg-green-500' : error ? 'bg-red-500' : 'bg-yellow-500'
-            }`} />
-            <span className="text-xs text-muted-foreground">
-              {isConnected ? 'Connected' : error ? 'Error' : 'Connecting...'}
-            </span>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-2 bg-background/50 rounded-lg border">
+              {isConnected ? (
+                <Wifi className="h-4 w-4 text-green-500" />
+              ) : (
+                <WifiOff className="h-4 w-4 text-red-500" />
+              )}
+              <span className="text-sm font-medium">
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+            {error && (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={reconnect}
+                className="text-red-500 hover:text-red-600"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Reconnect
+              </Button>
+            )}
           </div>
           
           <ThemeToggle />

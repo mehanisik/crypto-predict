@@ -48,7 +48,13 @@ def create_app(config_name=None):
     socketio.init_app(
         app,
         cors_allowed_origins=config.CORS_ORIGINS,
-        message_queue=config.REDIS_URL
+        message_queue=config.REDIS_URL,
+        async_mode='eventlet',
+        ping_timeout=60,
+        ping_interval=25,
+        max_http_buffer_size=1e8,  # 100MB
+        logger=True,
+        engineio_logger=True
     )
     
     swagger_config = {
@@ -129,13 +135,8 @@ def create_app(config_name=None):
         except Exception:
             return False
 
-    # Exempt health endpoint from rate limiting
-    @limiter.request_filter
-    def _exempt_healthcheck():
-        try:
-            return request.path.startswith('/api/v1/health')
-        except Exception:
-            return False
+    # Add custom rate limit for health checks (more restrictive)
+    limiter.limit("10 per minute", key_func=get_remote_address, scope="health")
 
     # Exempt Prometheus metrics from rate limiting
     @limiter.request_filter

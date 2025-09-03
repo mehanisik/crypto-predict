@@ -2,30 +2,32 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 import numpy as np
 from pathlib import Path
-from joblib import dump, load
+from joblib import dump, load  # type: ignore
 import structlog
-import tensorflow as tf
-import pandas as pd
+import tensorflow as tf  # type: ignore
+import pandas as pd  # type: ignore
 
 from .config import ModelConfig
 from .data.processor import DataProcessor
-from .visualization.visualizer import Visualizer
 from .models import CNNModel, LSTMModel, CNNLSTMModel, LSTMCNNModel
 from .websocket.manager import WebSocketManager
 from .data.metrics_calculator import MetricsCalculator
 
-LATEST_MODEL_PATH = Path("models/latest_model.joblib")
+# Use container app root (/app) as base so models map to /app/models
+BASE_DIR = Path(__file__).resolve().parents[1]
+LATEST_MODEL_PATH = (BASE_DIR / "models" / "latest_model.joblib").resolve()
 
 class CryptoPredictor:
     def __init__(self, config: ModelConfig, websocket_manager: WebSocketManager):
         self.config = config
         self.model = None
         self.data_processor = DataProcessor(config)
-        self.visualizer = Visualizer()
+        # Visualizer is heavy (matplotlib/seaborn); import lazily in training path
+        self.visualizer = None
         self.websocket_manager = websocket_manager
         self.logger = structlog.get_logger(__name__)
 
-    def train(self, ticker_symbol: str, start_date: str, end_date: str) -> Dict:
+    def train(self, ticker_symbol: str, start_date: str, end_date: str, *, session_id: str) -> Dict:
         """
         Train the model on the specified stock data.
         
@@ -44,15 +46,35 @@ class CryptoPredictor:
                            start_date=start_date, 
                            end_date=end_date)
 
+            # Data fetching stage
+            self.websocket_manager.emit_stage(session_id, 'data_fetching', {
+                'status': 'started',
+                'ticker': ticker_symbol,
+                'start_date': start_date,
+                'end_date': end_date
+            })
+
             # Prepare data with multiple features
             (X_train, y_train), (X_test, y_test), original_prices = \
                 self.data_processor.fetch_and_prepare_data(ticker_symbol, start_date, end_date, use_multiple_features=True)
 
+            # Emit fetched data summary
+            try:
+                self.websocket_manager.emit_stage(session_id, 'data_fetched', {
+                    'rows': int(len(original_prices)),
+                    'train_samples': int(len(X_train)),
+                    'test_samples': int(len(X_test)),
+                    'lookback': int(self.config.lookback)
+                })
+            except Exception as e:
+                self.logger.warning("data_fetched_emit_failed", error=str(e))
+
             # WebSocket callback for real-time updates
             class WSCallback(tf.keras.callbacks.Callback):
-                def __init__(self, predictor):
+                def __init__(self, predictor, session_id: str):
                     super().__init__()
                     self.predictor = predictor
+                    self.session_id = session_id
                     self.training_start = datetime.now()
                     self.last_update = datetime.now()
                     self.update_interval = 0.5  # Reduce update interval for more frequent updates
@@ -61,8 +83,9 @@ class CryptoPredictor:
 
                 def on_train_begin(self, logs=None):
                     # Initial stage notification
-                    self.predictor.websocket_manager.broadcast_stage_update(
-                        "training_update", 
+                    self.predictor.websocket_manager.emit_stage(
+                        self.session_id,
+                        'training_update',
                         {
                             'status': 'started',
                             'message': 'Model training initiated',
@@ -88,8 +111,9 @@ class CryptoPredictor:
                     
                     # Force immediate update
                     self.predictor.websocket_manager.socketio.sleep(0)
-                    self.predictor.websocket_manager.broadcast_stage_update(
-                        "training_update", 
+                    self.predictor.websocket_manager.emit_stage(
+                        self.session_id,
+                        'training_update',
                         update_data
                     )
 
@@ -101,10 +125,25 @@ class CryptoPredictor:
                         'progress': 100,
                         'total_epochs': self.total_epochs
                     }
-                    self.predictor.websocket_manager.broadcast_stage_update(
-                        "training_update", 
+                    self.predictor.websocket_manager.emit_stage(
+                        self.session_id,
+                        'training_update',
                         final_update
                     )
+
+            # Preprocessing summary
+            try:
+                features_count = X_train.shape[-1] if len(X_train.shape) == 3 else 1
+                self.websocket_manager.emit_stage(session_id, 'preprocessing', {
+                    'status': 'completed',
+                    'train_shape': list(X_train.shape),
+                    'test_shape': list(X_test.shape),
+                    'target_shape_train': list(y_train.shape),
+                    'target_shape_test': list(y_test.shape),
+                    'features': int(features_count)
+                })
+            except Exception as e:
+                self.logger.warning("preprocessing_emit_failed", error=str(e))
 
             # Initialize model
             self.logger.info("initializing_model")
@@ -130,7 +169,32 @@ class CryptoPredictor:
                 # Default to 5 features (OHLCV)
                 input_shape = (self.config.lookback, 5)
             
-            self.model = model_builder.build(input_shape)
+            # Feature engineering & model building emits
+            try:
+                self.websocket_manager.emit_stage(session_id, 'feature_engineering', {
+                    'status': 'using_features',
+                    'features': int(input_shape[-1]),
+                    'lookback': int(input_shape[0])
+                })
+
+                self.websocket_manager.emit_stage(session_id, 'model_building', {
+                    'status': 'started',
+                    'model_type': self.config.model,
+                    'input_shape': list(input_shape),
+                    'epochs': int(self.config.epochs),
+                    'batch_size': int(self.config.batch_size),
+                    'learning_rate': float(self.config.learning_rate)
+                })
+
+                self.model = model_builder.build(input_shape)
+
+                self.websocket_manager.emit_stage(session_id, 'model_info', {
+                    'status': 'built',
+                    'input_shape': list(input_shape),
+                    'model_type': self.config.model
+                })
+            except Exception as e:
+                self.logger.warning("model_building_emit_failed", error=str(e))
             
             # Add early stopping callback
             from tensorflow.keras.callbacks import EarlyStopping
@@ -149,7 +213,7 @@ class CryptoPredictor:
                 epochs=self.config.epochs,
                 batch_size=self.config.batch_size,
                 verbose=0,  # Disable default progress bar
-                callbacks=[WSCallback(self), early_stopping]
+                callbacks=[WSCallback(self, session_id), early_stopping]
             )
 
             # Generate and validate predictions
@@ -195,7 +259,7 @@ class CryptoPredictor:
 
             for i, metric in enumerate(metrics_list, 1):
                 progress = (i / total_metrics) * 100
-                self.websocket_manager.broadcast_stage_update("evaluating_update", {
+                self.websocket_manager.emit_stage(session_id, "evaluating_update", {
                     'current_metric': metric,
                     'total_metrics': total_metrics,
                     'progress': progress,
@@ -212,7 +276,7 @@ class CryptoPredictor:
             )
 
             self.websocket_manager.socketio.sleep(1)  # Add delay before final metrics
-            self.websocket_manager.broadcast_stage_update("evaluating_update", {
+            self.websocket_manager.emit_stage(session_id, "evaluating_update", {
                 'type': 'evaluation',
                 'metrics': {
                     'train': train_metrics,
@@ -222,7 +286,10 @@ class CryptoPredictor:
             })
             self.websocket_manager.socketio.sleep(2)  # Add longer delay before visualization stage
 
-            # Generate visualization plots
+            # Generate visualization plots (lazy import to avoid seaborn/matplotlib on predict path)
+            from .visualization.visualizer import Visualizer  # type: ignore
+            if self.visualizer is None:
+                self.visualizer = Visualizer()
             self.logger.info("generating_visualizations")
             self.websocket_manager.socketio.sleep(1)  # Add delay before starting visualizations
 
@@ -246,8 +313,8 @@ class CryptoPredictor:
                 'test_pred': test_pred,
                 'train_size': len(X_train) + self.config.lookback,
                 'lookback': self.config.lookback,
-                'mean': self.data_processor.mean,
-                'std': self.data_processor.std
+                'mean': self.data_processor.mean[-1] if hasattr(self.data_processor.mean, '__len__') else self.data_processor.mean,
+                'std': self.data_processor.std[-1] if hasattr(self.data_processor.std, '__len__') else self.data_processor.std
             }
         },
         {
@@ -257,8 +324,8 @@ class CryptoPredictor:
             'params': {
                 'y_true': y_test,
                 'y_pred': test_pred,
-                'mean': self.data_processor.mean,
-                'std': self.data_processor.std
+                'mean': self.data_processor.mean[-1] if hasattr(self.data_processor.mean, '__len__') else self.data_processor.mean,
+                'std': self.data_processor.std[-1] if hasattr(self.data_processor.std, '__len__') else self.data_processor.std
             }
         },
         {
@@ -268,8 +335,8 @@ class CryptoPredictor:
             'params': {
                 'y_true': y_test,
                 'y_pred': test_pred,
-                'mean': self.data_processor.mean,
-                'std': self.data_processor.std
+                'mean': self.data_processor.mean[-1] if hasattr(self.data_processor.mean, '__len__') else self.data_processor.mean,
+                'std': self.data_processor.std[-1] if hasattr(self.data_processor.std, '__len__') else self.data_processor.std
             }
         },
         {
@@ -279,8 +346,8 @@ class CryptoPredictor:
             'params': {
                 'y_true': y_test,
                 'y_pred': test_pred,
-                'mean': self.data_processor.mean,
-                'std': self.data_processor.std
+                'mean': self.data_processor.mean[-1] if hasattr(self.data_processor.mean, '__len__') else self.data_processor.mean,
+                'std': self.data_processor.std[-1] if hasattr(self.data_processor.std, '__len__') else self.data_processor.std
             }
         },
         {
@@ -290,8 +357,8 @@ class CryptoPredictor:
             'params': {
                 'y_true': y_test,
                 'y_pred': test_pred,
-                'mean': self.data_processor.mean,
-                'std': self.data_processor.std
+                'mean': self.data_processor.mean[-1] if hasattr(self.data_processor.mean, '__len__') else self.data_processor.mean,
+                'std': self.data_processor.std[-1] if hasattr(self.data_processor.std, '__len__') else self.data_processor.std
             }
         },
         {
@@ -301,8 +368,8 @@ class CryptoPredictor:
             'params': {
                 'y_true': y_test,
                 'y_pred': test_pred,
-                'mean': self.data_processor.mean,
-                'std': self.data_processor.std,
+                'mean': self.data_processor.mean[-1] if hasattr(self.data_processor.mean, '__len__') else self.data_processor.mean,
+                'std': self.data_processor.std[-1] if hasattr(self.data_processor.std, '__len__') else self.data_processor.std,
                 'window': 20
             }
         },
@@ -372,7 +439,7 @@ class CryptoPredictor:
                 progress = (current_plot / total_plots) * 100
                 
                 # Send plot start update
-                self.websocket_manager.broadcast_stage_update("visualizing_update", {
+                self.websocket_manager.emit_stage(session_id, "visualizing_update", {
                     'current_plot': task['name'],
                     'plot_title': task['title'],
                     'total_plots': total_plots,
@@ -390,7 +457,7 @@ class CryptoPredictor:
                     plots[task['name']] = plot
                     
                     # Send plot complete update
-                    self.websocket_manager.broadcast_stage_update("visualizing_update", {
+                    self.websocket_manager.emit_stage(session_id, "visualizing_update", {
                         'current_plot': task['name'],
                         'plot_title': task['title'],
                         'total_plots': total_plots,
@@ -401,14 +468,23 @@ class CryptoPredictor:
                     })
                     
                 except Exception as e:
-                    # Handle errors
-                    self.logger.error("plot_generation_failed", 
+                    # Handle errors gracefully
+                    self.logger.warning("plot_generation_failed", 
                                     plot_name=task['name'],
-                                    error=str(e),
-                                    exc_info=True)
+                                    error=str(e))
+                    
+                    # Send error update to client
+                    self.websocket_manager.emit_stage(session_id, "visualizing_update", {
+                        'current_plot': task['name'],
+                        'plot_title': task['title'],
+                        'total_plots': total_plots,
+                        'progress': progress,
+                        'status': 'failed',
+                        'error': str(e)
+                    })
 
             # Final completion update
-            self.websocket_manager.broadcast_stage_update("visualizing_update", {
+            self.websocket_manager.emit_stage(session_id, "visualizing_update", {
                 'current_plot': 'all',
                 'total_plots': total_plots,
                 'progress': 100,
@@ -432,15 +508,6 @@ class CryptoPredictor:
 
             # After evaluation completes
             self.websocket_manager.socketio.sleep(2)  # Pause before visualization
-
-            # Add progress heartbeat
-            def progress_heartbeat():
-                while current_progress < 100:
-                    self.websocket_manager.socketio.sleep(0.5)
-                    self.websocket_manager.broadcast_stage_update(
-                        "heartbeat", 
-                        {'progress': current_progress}
-                    )
 
             return {
                 'train_metrics': train_metrics,
@@ -472,6 +539,14 @@ class CryptoPredictor:
                 'config': self.config.__dict__
             }
         }
+        # Persist number of features used during training to reconstruct input shape
+        try:
+            if hasattr(self.data_processor, 'df') and self.data_processor.df is not None:
+                state['num_features'] = int(len(self.data_processor.df.columns))
+            else:
+                state['num_features'] = 1
+        except Exception:
+            state['num_features'] = 1
         dump(state, LATEST_MODEL_PATH)
         self.logger.info("model_state_saved", path=str(LATEST_MODEL_PATH))
 
@@ -498,8 +573,21 @@ class CryptoPredictor:
             else:
                 raise ValueError(f"Invalid model: {config.model}")
             
-            predictor.model = model_builder.build((config.lookback, 1))
-            predictor.model.set_weights(state['model_weights'])
+            # Rebuild model with training-time feature count
+            num_features = state.get('num_features')
+            if not num_features:
+                mean = state['data_processor'].get('mean')
+                try:
+                    import numpy as np
+                    num_features = int(np.array(mean).shape[0]) if mean is not None and hasattr(mean, '__len__') else 1
+                except Exception:
+                    num_features = 1
+            predictor.model = model_builder.build((config.lookback, num_features))
+            try:
+                predictor.model.set_weights(state['model_weights'])
+            except Exception as weight_err:
+                # If weights mismatch (e.g., architecture drift), log and continue with fresh model
+                structlog.get_logger(__name__).error("failed_to_set_weights", error=str(weight_err))
             
             # Restore data processor state
             predictor.data_processor.mean = state['data_processor']['mean']
@@ -508,7 +596,8 @@ class CryptoPredictor:
             
             return predictor
         except Exception as e:
-            cls.logger.error("failed_to_load_model", error=str(e), exc_info=True)
+            # Use module logger since classmethod has no instance logger
+            structlog.get_logger(__name__).error("failed_to_load_model", error=str(e), exc_info=True)
             return None
 
     def predict(self, data: np.ndarray) -> np.ndarray:
@@ -577,19 +666,39 @@ class CryptoPredictor:
             predictions = []
             current_window = initial_data.copy()
             
-            # Calculate volatility using a longer window
-            historical_volatility = self.data_processor.std * np.std(current_window)
+            # Calculate volatility proxy on target feature (last column if multi-feature)
+            if isinstance(self.data_processor.std, (list, tuple, np.ndarray)):
+                target_std = float(np.array(self.data_processor.std)[-1])
+            else:
+                target_std = float(self.data_processor.std)
+            try:
+                target_series = current_window[:, -1]
+            except Exception:
+                target_series = current_window
+            historical_volatility = target_std * float(np.std(target_series))
             
             # Increase uncertainty for further predictions
             base_uncertainty = historical_volatility * 2  # Double the historical volatility for base uncertainty
             
             for day in range(days):
                 # Prepare prediction window
-                input_data = current_window[-self.config.lookback:].reshape(1, self.config.lookback, 1)
+                input_data = current_window[-self.config.lookback:]
+                if hasattr(input_data, 'shape') and len(input_data.shape) == 1:
+                    input_data = input_data.reshape(self.config.lookback, 1)
+                expected_features = int(self.model.input_shape[-1]) if self.model is not None else input_data.shape[-1]
+                if len(input_data.shape) == 2 and input_data.shape[-1] > expected_features:
+                    input_data = input_data[:, -expected_features:]
+                input_data = input_data.reshape(1, self.config.lookback, expected_features)
                 
                 # Make prediction
                 prediction = self.model.predict(input_data, verbose=0)
-                predicted_value = float(prediction[0, 0] * self.data_processor.std + self.data_processor.mean)
+                if isinstance(self.data_processor.mean, (list, tuple, np.ndarray)):
+                    mean_target = float(np.array(self.data_processor.mean)[-1])
+                    std_target = float(np.array(self.data_processor.std)[-1])
+                else:
+                    mean_target = float(self.data_processor.mean)
+                    std_target = float(self.data_processor.std)
+                predicted_value = float(prediction[0, 0] * (std_target if std_target != 0 else 1.0) + mean_target)
                 
                 # Increase confidence interval with time
                 time_factor = 1 + (day * 0.1)  # 10% increase in uncertainty per day
@@ -610,8 +719,13 @@ class CryptoPredictor:
                 predictions.append(prediction_data)
                 
                 # Update window with prediction for next iteration
-                normalized_prediction = (predicted_value - self.data_processor.mean) / self.data_processor.std
-                current_window = np.append(current_window[1:], normalized_prediction)
+                norm_pred = (predicted_value - mean_target) / (std_target if std_target != 0 else 1.0)
+                if hasattr(current_window, 'shape') and len(current_window.shape) > 1:
+                    next_row = current_window[-1].copy()
+                    next_row[-1] = norm_pred
+                    current_window = np.vstack([current_window[1:], next_row])
+                else:
+                    current_window = np.append(current_window[1:], norm_pred)
                 
             return predictions
             

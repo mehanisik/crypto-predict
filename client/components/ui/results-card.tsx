@@ -4,7 +4,7 @@ import { formatNumber } from "@/lib/utils";
 import { LineChart, Line, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Progress } from "@/components/ui/progress";
 import { ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { PredictionResponse } from "@/types/prediction-response";
+import { PredictionResponse } from "@/lib/api";
 
 interface ResultsCardProps {
   predictions?: PredictionResponse;

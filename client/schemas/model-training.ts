@@ -15,9 +15,9 @@ const trainingSchema = z.object({
   endDate: z.string().refine((value) => !isNaN(Date.parse(value)), {
     message: "Invalid date",
   }),
-  lookback: z.number().min(1).max(60).default(8),
+  lookback: z.number().min(10).max(60).default(10),
   epochs: z.number().min(1).max(1000).default(100),
-  batchSize: z.number().min(1).max(1000).default(32),
+  batchSize: z.number().min(8).max(256).default(32),
   learningRate: z.number().min(0.0001).max(0.1).default(0.001),
 });
 

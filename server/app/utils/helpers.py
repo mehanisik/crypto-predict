@@ -1,4 +1,5 @@
 import uuid
+import time
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 from app.utils.logger import get_logger
@@ -7,7 +8,12 @@ logger = get_logger(__name__)
 
 
 def generate_request_id() -> str:
-    return datetime.now().strftime('%Y%m%d%H%M%S') + '_' + str(uuid.uuid4())[:8]
+    """Generate a unique request ID with timestamp and UUID components."""
+    # Get current timestamp with microseconds for better uniqueness
+    timestamp = datetime.now().strftime('%Y%m%d%H%M%S%f')[:-3]  # Include milliseconds
+    # Generate a full UUID and take more characters for better uniqueness
+    unique_id = str(uuid.uuid4()).replace('-', '')[:12]
+    return f"{timestamp}_{unique_id}"
 
 
 def fetch_historical_data(ticker: str, start_date: datetime, lookback: int) -> Optional[Any]:

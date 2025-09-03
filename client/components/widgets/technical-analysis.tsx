@@ -12,6 +12,7 @@ export function LiveChartWidget() {
   return (
     <Widget
       title="Technical Analysis"
+      fullHeight
       headerContent={
         <ToggleGroup
           type="single"
@@ -27,8 +28,8 @@ export function LiveChartWidget() {
         </ToggleGroup>
       }
     >
-      <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex-1 relative min-h-0">
+      <div className="relative w-full h-full">
+        <div className="absolute inset-0">
           <TradingViewWidget symbol={symbol} />
         </div>
       </div>

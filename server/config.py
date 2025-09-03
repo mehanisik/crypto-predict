@@ -14,9 +14,9 @@ class BaseConfig:
     FLASK_ENV: str = os.getenv('FLASK_ENV', 'development')
     DEBUG: bool = os.getenv('FLASK_ENV') == 'development'
     
-    # Database settings - Use SQLite for development
-    DATABASE_URL: str = os.getenv('DATABASE_URL', 'sqlite:///crypto_predict.db')
-    SQLALCHEMY_DATABASE_URI: str = os.getenv('DATABASE_URL', 'sqlite:///crypto_predict.db')
+    # Database settings - Require Postgres/Neon URL via env var
+    DATABASE_URL: str = os.getenv('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI: str = os.getenv('DATABASE_URL')
     SQLALCHEMY_TRACK_MODIFICATIONS: bool = False
     SQLALCHEMY_ENGINE_OPTIONS: dict = None
     
@@ -73,21 +73,18 @@ class BaseConfig:
         if self.CORS_ORIGINS is None:
             self.CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5000']
         
+        # Ensure a database URL is provided
+        if not self.SQLALCHEMY_DATABASE_URI:
+            raise ValueError("DATABASE_URL environment variable is required and must point to your Postgres/Neon database")
+
         if self.SQLALCHEMY_ENGINE_OPTIONS is None:
-            # Use SQLite-friendly settings for development
-            if 'sqlite' in self.SQLALCHEMY_DATABASE_URI.lower():
-                self.SQLALCHEMY_ENGINE_OPTIONS = {
-                    'pool_pre_ping': False,
-                    'echo': False  # Changed from self.DEBUG to False
-                }
-            else:
-                # PostgreSQL settings
-                self.SQLALCHEMY_ENGINE_OPTIONS = {
-                    'pool_size': int(os.getenv('DB_POOL_SIZE', '10')),
-                    'pool_timeout': int(os.getenv('DB_POOL_TIMEOUT', '30')),
-                    'pool_recycle': int(os.getenv('DB_POOL_RECYCLE', '3600')),
-                    'max_overflow': int(os.getenv('DB_MAX_OVERFLOW', '20'))
-                }
+            # Default to PostgreSQL-friendly settings
+            self.SQLALCHEMY_ENGINE_OPTIONS = {
+                'pool_size': int(os.getenv('DB_POOL_SIZE', '10')),
+                'pool_timeout': int(os.getenv('DB_POOL_TIMEOUT', '30')),
+                'pool_recycle': int(os.getenv('DB_POOL_RECYCLE', '3600')),
+                'max_overflow': int(os.getenv('DB_MAX_OVERFLOW', '20'))
+            }
 
 
 @dataclass
@@ -95,15 +92,11 @@ class DevelopmentConfig(BaseConfig):
     """Development configuration."""
     
     DEBUG: bool = True
-    LOG_LEVEL: str = 'INFO'  # Changed from DEBUG to INFO
+    LOG_LEVEL: str = 'INFO'
     
     # Development-specific settings
-    SQLALCHEMY_ECHO: bool = False  # Changed from True to False
+    SQLALCHEMY_ECHO: bool = False
     PRESERVE_CONTEXT_ON_EXCEPTION: bool = False
-    
-    # Use SQLite for development
-    DATABASE_URL: str = 'sqlite:///crypto_predict.db'
-    SQLALCHEMY_DATABASE_URI: str = 'sqlite:///crypto_predict.db'
     
     # Use simple cache for development
     CACHE_TYPE: str = 'simple'
@@ -115,11 +108,11 @@ class TestingConfig(BaseConfig):
     
     TESTING: bool = True
     DEBUG: bool = True
-    LOG_LEVEL: str = 'INFO'  # Changed from DEBUG to INFO
+    LOG_LEVEL: str = 'INFO'
     
-    # Use test database
-    DATABASE_URL: str = os.getenv('TEST_DATABASE_URL', 'sqlite:///crypto_predict_test.db')
-    SQLALCHEMY_DATABASE_URI: str = os.getenv('TEST_DATABASE_URL', 'sqlite:///crypto_predict_test.db')
+    # Use test database (Postgres) if provided, otherwise fall back to DATABASE_URL
+    DATABASE_URL: str = os.getenv('TEST_DATABASE_URL', os.getenv('DATABASE_URL'))
+    SQLALCHEMY_DATABASE_URI: str = os.getenv('TEST_DATABASE_URL', os.getenv('DATABASE_URL'))
     
     # Disable CSRF for testing
     WTF_CSRF_ENABLED: bool = False

@@ -7,10 +7,13 @@ services:
     command: gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:5000 run:app
     ports:
       - "5000:5000"
+    env_file:
+      - .env
     environment:
       - EVENTLET_NO_GREENDNS=yes
       - FLASK_ENV=production
-      - DATABASE_URL=postgresql://neondb_owner:npg_hFgzYBLtA5x8@ep-tiny-paper-afkuw2th-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require
+      - POLYGON_API_KEY=${POLYGON_API_KEY}
+      - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
       - BROKER_URL=redis://redis:6379/1
       - RESULT_BACKEND=redis://redis:6379/2
@@ -24,15 +27,28 @@ services:
     restart: unless-stopped
     networks:
       - crypto-network
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
 
   # Celery worker for background tasks
   celery:
     build: .
     command: celery -A app.celery:celery worker --loglevel=info
+    env_file:
+      - .env
     environment:
       - EVENTLET_NO_GREENDNS=yes
       - FLASK_ENV=production
-      - DATABASE_URL=postgresql://neondb_owner:npg_hFgzYBLtA5x8@ep-tiny-paper-afkuw2th-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require
+      - POLYGON_API_KEY=${POLYGON_API_KEY}
+      - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
       - BROKER_URL=redis://redis:6379/1
       - RESULT_BACKEND=redis://redis:6379/2
@@ -50,10 +66,13 @@ services:
   celery-beat:
     build: .
     command: celery -A app.celery:celery beat --loglevel=info
+    env_file:
+      - .env
     environment:
       - EVENTLET_NO_GREENDNS=yes
       - FLASK_ENV=production
-      - DATABASE_URL=postgresql://neondb_owner:npg_hFgzYBLtA5x8@ep-tiny-paper-afkuw2th-pooler.c-2.us-west-2.aws.neon.tech/neondb?sslmode=require
+      - POLYGON_API_KEY=${POLYGON_API_KEY}
+      - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
       - BROKER_URL=redis://redis:6379/1
       - RESULT_BACKEND=redis://redis:6379/2
@@ -80,10 +99,12 @@ services:
   # PostgreSQL database
   db:
     image: postgres:15-alpine
+    env_file:
+      - .env
     environment:
-      - POSTGRES_DB=crypto_predict
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:

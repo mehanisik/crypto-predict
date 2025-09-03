@@ -29,14 +29,19 @@ COPY . .
 # Create non-root user
 RUN adduser --disabled-password --gecos '' appuser
 RUN chown -R appuser:appuser /app
+
+# Set ulimit for file descriptors
+RUN echo "appuser soft nofile 65536" >> /etc/security/limits.conf
+RUN echo "appuser hard nofile 65536" >> /etc/security/limits.conf
+
 USER appuser
 
 # Expose port
 EXPOSE 5000
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=60s --timeout=30s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:5000/api/v1/health || exit 1
 
-# Run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--worker-class", "eventlet", "--timeout", "120", "run:app"] 
+# Run the application with increased file descriptor limit
+CMD ["sh", "-c", "ulimit -n 65536 && gunicorn --bind 0.0.0.0:5000 --workers 4 --worker-class eventlet --timeout 120 --max-requests 1000 --max-requests-jitter 100 run:app"] 

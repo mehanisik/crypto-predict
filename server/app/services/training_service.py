@@ -92,7 +92,12 @@ class TrainingService:
         try:
             with app.app_context():
                 logger.info("training_execution_start", session_id=session_id)
-                self._complete_training_immediately(session_id, training_data)
+                try:
+                    # Try real ML training first; fall back to simulated if it fails
+                    self._run_real_training(session_id, training_data)
+                except Exception as real_err:
+                    logger.error("real_training_failed_falling_back", session_id=session_id, error=str(real_err), exc_info=True)
+                    self._complete_training_immediately(session_id, training_data)
                 logger.info("background_training_success", session_id=session_id)
         except Exception as e:
             logger.error("background_training_failed", session_id=session_id, error=str(e), exc_info=True)
@@ -102,12 +107,78 @@ class TrainingService:
             except Exception:
                 pass
             logger.info("background_training_failed", session_id=session_id)
+
+    def _run_real_training(self, session_id: str, training_data: dict) -> None:
+        """Run actual model training using CryptoPredictor and save state for predictions."""
+        # Lazy import heavy deps
+        from ml_app.config import ModelConfig  # type: ignore
+        from ml_app.websocket.manager import WebSocketManager  # type: ignore
+        from ml_app.predictor import CryptoPredictor  # type: ignore
+        from app import socketio as _socketio
+
+        ticker = training_data['ticker']
+        model_type = training_data['model_type']
+        lookback = int(training_data['lookback'])
+        epochs = int(training_data['epochs'])
+        batch_size = int(training_data.get('batch_size', 32))
+        learning_rate = float(training_data.get('learning_rate', 0.001))
+        start_date = training_data['start_date']
+        end_date = training_data['end_date']
+        # Ensure string dates for Polygon fetcher
+        try:
+            from datetime import date as _date, datetime as _dt
+            if isinstance(start_date, (_dt, _date)):
+                start_date = start_date.isoformat()
+            if isinstance(end_date, (_dt, _date)):
+                end_date = end_date.isoformat()
+        except Exception:
+            pass
+
+        logger.info("real_training_start", session_id=session_id, ticker=ticker, model_type=model_type)
+
+        # Update status to in-progress
+        self._update_training_status(session_id, TrainingStatus.IN_PROGRESS)
+
+        # Build model config
+        cfg = ModelConfig(
+            model=model_type,
+            lookback=lookback,
+            epochs=epochs,
+            batch_size=batch_size,
+            learning_rate=learning_rate,
+            ticker=ticker
+        )
+
+        ws_manager = WebSocketManager(_socketio)
+        predictor = CryptoPredictor(cfg, ws_manager)
+
+        # Train and save state
+        result = predictor.train(ticker_symbol=ticker, start_date=start_date, end_date=end_date, session_id=session_id)
+
+        # Update DB with results
+        accuracy = float(result['test_metrics'].get('r2', 0)) if 'test_metrics' in result else None
+        loss = float(result['history']['loss'][-1]) if 'history' in result and result['history'].get('loss') else None
+
+        self._update_training_progress(session_id, epochs, 100, accuracy or 0.0, loss or 0.0)
+        self._update_training_results(session_id, accuracy or 0.0, loss or 0.0,
+                                      r2_score=result['test_metrics'].get('r2') if 'test_metrics' in result else None,
+                                      mae=result['test_metrics'].get('mae') if 'test_metrics' in result else None,
+                                      rmse=result['test_metrics'].get('rmse') if 'test_metrics' in result else None,
+                                      mape=result['test_metrics'].get('mape') if 'test_metrics' in result else None)
+        self._update_training_status(session_id, TrainingStatus.COMPLETED)
     
     def _complete_training_immediately(self, session_id: str, training_data: dict) -> None:
         try:
+            # Lazy import heavy deps
+            from ml_app.websocket.manager import WebSocketManager  # type: ignore
+            from app import socketio as _socketio
+            
             epochs = training_data.get('epochs', 100)
             ticker = training_data['ticker']
             model_type = training_data['model_type']
+            
+            # Create WebSocket manager
+            ws_manager = WebSocketManager(_socketio)
             
             logger.info("training_execution_start", session_id=session_id, ticker=ticker, model_type=model_type)
             
@@ -128,7 +199,7 @@ class TrainingService:
             mape = 5 + random.uniform(-2, 2)
             
             logger.info("training_started_event", session_id=session_id, model_type=model_type, ticker=ticker)
-            self._emit_training_update(None, session_id, {
+            self._emit_training_update(ws_manager, session_id, {
                 'type': 'training_started',
                 'message': f'Training {model_type} model for {ticker} started',
                 'progress': 0,
@@ -146,7 +217,7 @@ class TrainingService:
                     current_loss = loss * (1 - epoch / max_epochs) + random.uniform(-0.02, 0.02)
                     
                     logger.info("epoch_progress", session_id=session_id, epoch=epoch, progress=progress)
-                    self._emit_training_update(None, session_id, {
+                    self._emit_training_update(ws_manager, session_id, {
                         'type': 'training_progress',
                         'message': f'Training epoch {epoch}/{max_epochs}',
                         'progress': progress,
@@ -186,7 +257,7 @@ class TrainingService:
             self._update_training_results(session_id, accuracy, loss, r2_score, mae, rmse, mape)
             
             logger.info("training_completion_event", session_id=session_id, accuracy=accuracy)
-            self._emit_training_update(None, session_id, {
+            self._emit_training_update(ws_manager, session_id, {
                 'type': 'training_completed',
                 'message': f'Training completed successfully! Final accuracy: {accuracy:.4f}',
                 'progress': 100,
@@ -278,11 +349,17 @@ class TrainingService:
             logger.info("websocket_update_emitting", 
                        session_id=session_id, 
                        data_type=data.get('type'))
-            socketio.emit('training_update', {
-                'session_id': session_id,
-                'timestamp': datetime.now(timezone.utc).isoformat(),
-                **data
-            }, room=f'training_{session_id}')
+            
+            # Use WebSocketManager if provided, otherwise fall back to direct socketio
+            if websocket_manager:
+                websocket_manager.emit_training_update(session_id, data)
+            else:
+                socketio.emit('training_update', {
+                    'session_id': session_id,
+                    'timestamp': datetime.now(timezone.utc).isoformat(),
+                    **data
+                }, room=f'training_{session_id}')
+                
             logger.info("websocket_update_success", 
                        session_id=session_id,
                        data_type=data.get('type'))

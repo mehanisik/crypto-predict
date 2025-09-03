@@ -33,7 +33,6 @@ export interface PredictionRequest {
   ticker: string;
   model_type?: string;
   start_date: string;
-  end_date: string;
   days: number;
 }
 
