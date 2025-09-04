@@ -27,6 +27,23 @@ class CryptoPredictor:
         self.websocket_manager = websocket_manager
         self.logger = structlog.get_logger(__name__)
 
+    def _get_model_builder(self):
+        """Get the appropriate model builder based on configuration."""
+        from .models import CNNModel, LSTMModel, CNNLSTMModel, LSTMCNNModel
+        
+        model_map = {
+            'CNN': CNNModel,
+            'LSTM': LSTMModel,
+            'CNN-LSTM': CNNLSTMModel,
+            'LSTM-CNN': LSTMCNNModel
+        }
+        
+        model_class = model_map.get(self.config.model)
+        if not model_class:
+            raise ValueError(f"Unsupported model type: {self.config.model}")
+        
+        return model_class()
+
     def train(self, ticker_symbol: str, start_date: str, end_date: str, *, session_id: str) -> Dict:
         """
         Train the model on the specified stock data.
@@ -51,7 +68,8 @@ class CryptoPredictor:
                 'status': 'started',
                 'ticker': ticker_symbol,
                 'start_date': start_date,
-                'end_date': end_date
+                'end_date': end_date,
+                'message': f'Fetching {ticker_symbol} data from {start_date} to {end_date}'
             })
 
             # Prepare data with multiple features
@@ -64,10 +82,53 @@ class CryptoPredictor:
                     'rows': int(len(original_prices)),
                     'train_samples': int(len(X_train)),
                     'test_samples': int(len(X_test)),
-                    'lookback': int(self.config.lookback)
+                    'lookback': int(self.config.lookback),
+                    'message': f'Retrieved {len(original_prices)} data points ({len(X_train)} train, {len(X_test)} test)'
                 })
             except Exception as e:
                 self.logger.warning("data_fetched_emit_failed", error=str(e))
+
+            # Preprocessing stage
+            self.websocket_manager.emit_stage(session_id, 'preprocessing', {
+                'status': 'completed',
+                'train_shape': list(X_train.shape),
+                'test_shape': list(X_test.shape),
+                'target_shape_train': list(y_train.shape),
+                'target_shape_test': list(y_test.shape),
+                'features': int(X_train.shape[2]),
+                'message': f'Preprocessed data: {X_train.shape[2]} features, {X_train.shape[0]} training samples'
+            })
+
+            # Feature engineering stage
+            self.websocket_manager.emit_stage(session_id, 'feature_engineering', {
+                'status': 'using_features',
+                'features': int(X_train.shape[2]),
+                'lookback': int(self.config.lookback),
+                'message': f'Using {X_train.shape[2]} engineered features with {self.config.lookback} lookback period'
+            })
+
+            # Model building stage
+            self.websocket_manager.emit_stage(session_id, 'model_building', {
+                'status': 'started',
+                'model_type': self.config.model,
+                'input_shape': list(X_train.shape[1:]),
+                'epochs': int(self.config.epochs),
+                'batch_size': int(self.config.batch_size),
+                'learning_rate': float(self.config.learning_rate),
+                'message': f'Building {self.config.model} model with {self.config.epochs} epochs'
+            })
+
+            # Build model
+            model_builder = self._get_model_builder()
+            self.model = model_builder.build(input_shape=X_train.shape[1:])
+
+            # Model info stage
+            self.websocket_manager.emit_stage(session_id, 'model_info', {
+                'status': 'built',
+                'input_shape': list(X_train.shape[1:]),
+                'model_type': self.config.model,
+                'message': f'{self.config.model} model built successfully with input shape {X_train.shape[1:]}'
+            })
 
             # WebSocket callback for real-time updates
             class WSCallback(tf.keras.callbacks.Callback):
@@ -77,8 +138,7 @@ class CryptoPredictor:
                     self.session_id = session_id
                     self.training_start = datetime.now()
                     self.last_update = datetime.now()
-                    self.update_interval = 0.5  # Reduce update interval for more frequent updates
-                    self.progress_smoothing = 0.0  # Exponential smoothing for progress
+                    self.update_interval = 0.3  # More frequent updates for smoother progress
                     self.total_epochs = predictor.config.epochs
 
                 def on_train_begin(self, logs=None):
@@ -88,443 +148,178 @@ class CryptoPredictor:
                         'training_update',
                         {
                             'status': 'started',
-                            'message': 'Model training initiated',
+                            'message': f'Starting {self.total_epochs} epochs of model training',
                             'total_epochs': self.total_epochs,
                             'progress': 0
                         }
                     )
 
-                def on_epoch_begin(self, epoch, logs=None):
-                    self.epoch_start = datetime.now()
-
                 def on_epoch_end(self, epoch, logs=None):
-                    current_progress = ((epoch + 1) / self.total_epochs) * 100
-                    update_data = {
-                        'epoch': epoch + 1,
-                        'total_epochs': self.total_epochs,
-                        'loss': float(logs.get('loss', 0)),
-                        'val_loss': float(logs.get('val_loss', 0)),
-                        'progress': current_progress,
-                        'status': 'training',
-                        'message': f'Epoch {epoch + 1}/{self.total_epochs} completed'
-                    }
+                    current_time = datetime.now()
                     
-                    # Force immediate update
-                    self.predictor.websocket_manager.socketio.sleep(0)
-                    self.predictor.websocket_manager.emit_stage(
-                        self.session_id,
-                        'training_update',
-                        update_data
-                    )
+                    # Check if enough time has passed since last update
+                    if (current_time - self.last_update).total_seconds() >= self.update_interval:
+                        accuracy = logs.get('accuracy', 0) if logs else 0
+                        loss = logs.get('loss', 0) if logs else 0
+                        val_accuracy = logs.get('val_accuracy', 0) if logs else 0
+                        val_loss = logs.get('val_loss', 0) if logs else 0
+                        
+                        # Use the new progress tracking system
+                        self.predictor.websocket_manager.emit_training_progress(
+                            self.session_id,
+                            epoch + 1,  # epoch is 0-indexed
+                            self.total_epochs,
+                            accuracy,
+                            loss
+                        )
+                        # Stream raw metric sample for client-side plotting
+                        try:
+                            self.predictor.websocket_manager.emit_metric_sample(
+                                self.session_id,
+                                epoch + 1,
+                                self.total_epochs,
+                                accuracy=accuracy,
+                                loss=loss,
+                                val_accuracy=val_accuracy,
+                                val_loss=val_loss
+                            )
+                        except Exception:
+                            pass
+                        
+                        self.last_update = current_time
 
-                def on_train_end(self, logs=None):
-                    # Final training stage completion
-                    final_update = {
-                        'status': 'completed',
-                        'message': 'Model training finished successfully',
-                        'progress': 100,
-                        'total_epochs': self.total_epochs
-                    }
-                    self.predictor.websocket_manager.emit_stage(
-                        self.session_id,
-                        'training_update',
-                        final_update
-                    )
-
-            # Preprocessing summary
-            try:
-                features_count = X_train.shape[-1] if len(X_train.shape) == 3 else 1
-                self.websocket_manager.emit_stage(session_id, 'preprocessing', {
-                    'status': 'completed',
-                    'train_shape': list(X_train.shape),
-                    'test_shape': list(X_test.shape),
-                    'target_shape_train': list(y_train.shape),
-                    'target_shape_test': list(y_test.shape),
-                    'features': int(features_count)
-                })
-            except Exception as e:
-                self.logger.warning("preprocessing_emit_failed", error=str(e))
-
-            # Initialize model
-            self.logger.info("initializing_model")
-            
-
-            if self.config.model == "CNN":
-                model_builder = CNNModel()
-            elif self.config.model == "LSTM":
-                model_builder = LSTMModel()
-            elif self.config.model == "CNN-LSTM":
-                model_builder = CNNLSTMModel()
-            elif self.config.model == "LSTM-CNN":
-                model_builder = LSTMCNNModel()
-            else:
-                raise ValueError(f"Invalid model: {self.config.model}")
-            
-            # Determine input shape based on features
-            if hasattr(self.data_processor, 'df') and self.data_processor.df is not None:
-                # Use actual number of features from data
-                num_features = len(self.data_processor.df.columns)
-                input_shape = (self.config.lookback, num_features)
-            else:
-                # Default to 5 features (OHLCV)
-                input_shape = (self.config.lookback, 5)
-            
-            # Feature engineering & model building emits
-            try:
-                self.websocket_manager.emit_stage(session_id, 'feature_engineering', {
-                    'status': 'using_features',
-                    'features': int(input_shape[-1]),
-                    'lookback': int(input_shape[0])
-                })
-
-                self.websocket_manager.emit_stage(session_id, 'model_building', {
-                    'status': 'started',
-                    'model_type': self.config.model,
-                    'input_shape': list(input_shape),
-                    'epochs': int(self.config.epochs),
-                    'batch_size': int(self.config.batch_size),
-                    'learning_rate': float(self.config.learning_rate)
-                })
-
-                self.model = model_builder.build(input_shape)
-
-                self.websocket_manager.emit_stage(session_id, 'model_info', {
-                    'status': 'built',
-                    'input_shape': list(input_shape),
-                    'model_type': self.config.model
-                })
-            except Exception as e:
-                self.logger.warning("model_building_emit_failed", error=str(e))
-            
-            # Add early stopping callback
-            from tensorflow.keras.callbacks import EarlyStopping
-            
-            early_stopping = EarlyStopping(
-                monitor='val_loss',
-                patience=self.config.early_stopping_patience,
-                restore_best_weights=True,
-                verbose=0
-            )
-            
-            # Train model
+            # Train the model
+            callback = WSCallback(self, session_id)
             history = self.model.fit(
                 X_train, y_train,
-                validation_data=(X_test, y_test),
                 epochs=self.config.epochs,
                 batch_size=self.config.batch_size,
-                verbose=0,  # Disable default progress bar
-                callbacks=[WSCallback(self, session_id), early_stopping]
+                validation_data=(X_test, y_test),
+                callbacks=[callback],
+                verbose=0
             )
 
-            # Generate and validate predictions
+            # Generate predictions
             self.logger.info("generating_predictions")
-            train_pred = self.model.predict(X_train, verbose=0)
-            test_pred = self.model.predict(X_test, verbose=0)
-            
-            # Ensure predictions are arrays, not scalars
-            if train_pred.ndim == 0:
-                train_pred = np.array([train_pred])
-            else:
-                train_pred = train_pred.squeeze()
-                
-            if test_pred.ndim == 0:
-                test_pred = np.array([test_pred])
-            else:
-                test_pred = test_pred.squeeze()
-            
-            # Ensure predictions and targets have the same shape
-            if train_pred.shape != y_train.shape:
-                self.logger.warning("train_pred_shape_mismatch", 
-                                  pred_shape=train_pred.shape, 
-                                  target_shape=y_train.shape)
-                # Reshape if possible
-                if train_pred.size == y_train.size:
-                    train_pred = train_pred.reshape(y_train.shape)
-                    
-            if test_pred.shape != y_test.shape:
-                self.logger.warning("test_pred_shape_mismatch", 
-                                  pred_shape=test_pred.shape, 
-                                  target_shape=y_test.shape)
-                # Reshape if possible
-                if test_pred.size == y_test.size:
-                    test_pred = test_pred.reshape(y_test.shape)
-            
-            # Evaluation stage
+            y_pred_train = self.model.predict(X_train, verbose=0)
+            y_pred_test = self.model.predict(X_test, verbose=0)
+
+            # Evaluation stage with detailed progress
             self.logger.info("starting_evaluation")
-            self.websocket_manager.socketio.sleep(1)  # Add initial delay
+            metrics_to_calculate = ['mae', 'rmse', 'r2', 'mape']
+            
+            for i, metric in enumerate(metrics_to_calculate):
+                self.websocket_manager.emit_evaluation_progress(
+                    session_id, 
+                    metric, 
+                    len(metrics_to_calculate), 
+                    i + 1
+                )
 
-            # Add proper progress increments with realistic timing
-            metrics_list = ['mae', 'rmse', 'r2', 'mape']
-            total_metrics = len(metrics_list)
+            # Calculate metrics
+            metrics_calc = MetricsCalculator()
+            train_metrics = metrics_calc.calculate_metrics(y_train, y_pred_train.flatten(), self.data_processor.mean, self.data_processor.std)
+            test_metrics = metrics_calc.calculate_metrics(y_test, y_pred_test.flatten(), self.data_processor.mean, self.data_processor.std)
 
-            for i, metric in enumerate(metrics_list, 1):
-                progress = (i / total_metrics) * 100
-                self.websocket_manager.emit_stage(session_id, "evaluating_update", {
-                    'current_metric': metric,
-                    'total_metrics': total_metrics,
-                    'progress': progress,
-                    'message': f'Calculating {metric.upper()} metric'
-                })
-                self.websocket_manager.socketio.sleep(2)  # Realistic processing time
-
-            # Calculate actual metrics
-            train_metrics = MetricsCalculator.calculate_metrics(
-                y_train, train_pred, self.data_processor.mean, self.data_processor.std
-            )
-            test_metrics = MetricsCalculator.calculate_metrics(
-                y_test, test_pred, self.data_processor.mean, self.data_processor.std
-            )
-
-            self.websocket_manager.socketio.sleep(1)  # Add delay before final metrics
-            self.websocket_manager.emit_stage(session_id, "evaluating_update", {
+            # Final evaluation update
+            self.websocket_manager.emit_stage(session_id, 'evaluating_update', {
                 'type': 'evaluation',
                 'metrics': {
                     'train': train_metrics,
                     'test': test_metrics
                 },
-                'progress': 100
-            })
-            self.websocket_manager.socketio.sleep(2)  # Add longer delay before visualization stage
-
-            # Generate visualization plots (lazy import to avoid seaborn/matplotlib on predict path)
-            from .visualization.visualizer import Visualizer  # type: ignore
-            if self.visualizer is None:
-                self.visualizer = Visualizer()
-            self.logger.info("generating_visualizations")
-            self.websocket_manager.socketio.sleep(1)  # Add delay before starting visualizations
-
-            plots = {}
-            visualization_tasks = [
-        {
-            'name': 'training_history',
-            'title': 'Training History',
-            'function': self.visualizer.plot_loss,
-            'params': {
-                'history': history.history
-            }
-        },
-        {
-            'name': 'predictions',
-            'title': 'Model Predictions',
-            'function': self.visualizer.plot_predictions,
-            'params': {
-                'original_prices': original_prices,
-                'train_pred': train_pred,
-                'test_pred': test_pred,
-                'train_size': len(X_train) + self.config.lookback,
-                'lookback': self.config.lookback,
-                'mean': self.data_processor.mean[-1] if hasattr(self.data_processor.mean, '__len__') else self.data_processor.mean,
-                'std': self.data_processor.std[-1] if hasattr(self.data_processor.std, '__len__') else self.data_processor.std
-            }
-        },
-        {
-            'name': 'residuals',
-            'title': 'Residual Analysis',
-            'function': self.visualizer.plot_residuals,
-            'params': {
-                'y_true': y_test,
-                'y_pred': test_pred,
-                'mean': self.data_processor.mean[-1] if hasattr(self.data_processor.mean, '__len__') else self.data_processor.mean,
-                'std': self.data_processor.std[-1] if hasattr(self.data_processor.std, '__len__') else self.data_processor.std
-            }
-        },
-        {
-            'name': 'error_distribution',
-            'title': 'Error Distribution',
-            'function': self.visualizer.plot_error_distribution,
-            'params': {
-                'y_true': y_test,
-                'y_pred': test_pred,
-                'mean': self.data_processor.mean[-1] if hasattr(self.data_processor.mean, '__len__') else self.data_processor.mean,
-                'std': self.data_processor.std[-1] if hasattr(self.data_processor.std, '__len__') else self.data_processor.std
-            }
-        },
-        {
-            'name': 'qq_plot',
-            'title': 'Q-Q Plot',
-            'function': self.visualizer.plot_qq,
-            'params': {
-                'y_true': y_test,
-                'y_pred': test_pred,
-                'mean': self.data_processor.mean[-1] if hasattr(self.data_processor.mean, '__len__') else self.data_processor.mean,
-                'std': self.data_processor.std[-1] if hasattr(self.data_processor.std, '__len__') else self.data_processor.std
-            }
-        },
-        {
-            'name': 'prediction_scatter',
-            'title': 'Actual vs Predicted',
-            'function': self.visualizer.plot_prediction_scatter,
-            'params': {
-                'y_true': y_test,
-                'y_pred': test_pred,
-                'mean': self.data_processor.mean[-1] if hasattr(self.data_processor.mean, '__len__') else self.data_processor.mean,
-                'std': self.data_processor.std[-1] if hasattr(self.data_processor.std, '__len__') else self.data_processor.std
-            }
-        },
-        {
-            'name': 'rolling_metrics',
-            'title': 'Rolling Performance Metrics',
-            'function': self.visualizer.plot_rolling_metrics,
-            'params': {
-                'y_true': y_test,
-                'y_pred': test_pred,
-                'mean': self.data_processor.mean[-1] if hasattr(self.data_processor.mean, '__len__') else self.data_processor.mean,
-                'std': self.data_processor.std[-1] if hasattr(self.data_processor.std, '__len__') else self.data_processor.std,
-                'window': 20
-            }
-        },
-        {
-            'name': 'candlestick',
-            'title': 'Price Action',
-            'function': self.visualizer.plot_candlestick,
-            'params': {
-                'df': self.data_processor.df,
-                'last_n_days': 30
-            }
-        },
-        {
-            'name': 'bollinger_bands',
-            'title': 'Bollinger Bands Analysis',
-            'function': self.visualizer.plot_bollinger_bands,
-            'params': {
-                'prices': original_prices,
-                'window': 20
-            }
-        },
-        {
-            'name': 'momentum',
-            'title': 'Momentum Indicators',
-            'function': self.visualizer.plot_momentum_indicators,
-            'params': {
-                'prices': original_prices,
-                'window': 14
-            }
-        },
-        {
-            'name': 'volume_profile',
-            'title': 'Volume Profile Analysis',
-            'function': self.visualizer.plot_volume_profile,
-            'params': {
-                'df': self.data_processor.df,
-                'n_bins': 50
-            }
-        },
-        {
-            'name': 'drawdown',
-            'title': 'Drawdown Analysis',
-            'function': self.visualizer.plot_drawdown,
-            'params': {
-                'prices': original_prices
-            }
-        },
-        {
-            'name': 'error_vs_volatility',
-            'title': 'Prediction Error vs Volatility',
-            'function': self.visualizer.plot_prediction_error_by_volatility,
-            'params': {
-                'y_true': y_test,
-                'y_pred': test_pred,
-                'prices': original_prices,
-                'window': 20
-            }
-        }
-    ]
-
-            # Generate each plot with progress updates
-            total_plots = len(visualization_tasks)
-            current_plot = 0
-
-            for task in visualization_tasks:
-                current_plot += 1
-                progress = (current_plot / total_plots) * 100
-                
-                # Send plot start update
-                self.websocket_manager.emit_stage(session_id, "visualizing_update", {
-                    'current_plot': task['name'],
-                    'plot_title': task['title'],
-                    'total_plots': total_plots,
-                    'progress': progress,
-                    'status': 'processing',
-                    'message': f'Generating {task["title"]} visualization'
-                })
-                
-                # Simulate processing time
-                self.websocket_manager.socketio.sleep(1.5)
-                
-                # Generate plot
-                try:
-                    plot = task['function'](**task['params'])
-                    plots[task['name']] = plot
-                    
-                    # Send plot complete update
-                    self.websocket_manager.emit_stage(session_id, "visualizing_update", {
-                        'current_plot': task['name'],
-                        'plot_title': task['title'],
-                        'total_plots': total_plots,
-                        'progress': progress,
-                        'status': 'completed',
-                        'duration': 1.5,
-                        'preview': plot[:100] + '...'  # Truncated base64
-                    })
-                    
-                except Exception as e:
-                    # Handle errors gracefully
-                    self.logger.warning("plot_generation_failed", 
-                                    plot_name=task['name'],
-                                    error=str(e))
-                    
-                    # Send error update to client
-                    self.websocket_manager.emit_stage(session_id, "visualizing_update", {
-                        'current_plot': task['name'],
-                        'plot_title': task['title'],
-                        'total_plots': total_plots,
-                        'progress': progress,
-                        'status': 'failed',
-                        'error': str(e)
-                    })
-
-            # Final completion update
-            self.websocket_manager.emit_stage(session_id, "visualizing_update", {
-                'current_plot': 'all',
-                'total_plots': total_plots,
                 'progress': 100,
-                'status': 'completed',
-                'plots_generated': list(plots.keys()),
-                'plots': plots
+                'message': f'Evaluation complete: R²={test_metrics.get("r2", 0):.4f}, MAE={test_metrics.get("mae", 0):.4f}'
             })
 
+            # Prepare and emit raw series for client-side visualization
+            try:
+                # Training history series
+                series: Dict[str, List[float]] = {}
+                if 'loss' in history.history:
+                    series['loss'] = [float(x) for x in history.history['loss']]
+                if 'accuracy' in history.history:
+                    series['accuracy'] = [float(x) for x in history.history['accuracy']]
+                if 'val_loss' in history.history:
+                    series['val_loss'] = [float(x) for x in history.history['val_loss']]
+                if 'val_accuracy' in history.history:
+                    series['val_accuracy'] = [float(x) for x in history.history['val_accuracy']]
+
+                # Denormalize predictions for series
+                if hasattr(self.data_processor, 'mean') and hasattr(self.data_processor, 'std'):
+                    mean = self.data_processor.mean
+                    std = self.data_processor.std
+                    if isinstance(mean, (list, tuple, np.ndarray)):
+                        mean_target = float(np.array(mean)[-1])
+                        std_target = float(np.array(std)[-1])
+                    else:
+                        mean_target = float(mean)
+                        std_target = float(std)
+                else:
+                    mean_target = 0.0
+                    std_target = 1.0
+
+                y_pred_train_denorm = (y_pred_train.flatten() * (std_target if std_target != 0 else 1.0)) + mean_target
+                y_pred_test_denorm = (y_pred_test.flatten() * (std_target if std_target != 0 else 1.0)) + mean_target
+                y_train_denorm = (y_train.flatten() * (std_target if std_target != 0 else 1.0)) + mean_target
+                y_test_denorm = (y_test.flatten() * (std_target if std_target != 0 else 1.0)) + mean_target
+
+                # Convert to lists for JSON
+                series_predictions: Dict[str, List[float]] = {
+                    'y_train': [float(x) for x in y_train_denorm],
+                    'y_pred_train': [float(x) for x in y_pred_train_denorm],
+                    'y_test': [float(x) for x in y_test_denorm],
+                    'y_pred_test': [float(x) for x in y_pred_test_denorm]
+                }
+
+                # Emit history series first
+                if series:
+                    self.websocket_manager.emit_series(session_id, series=series, meta={'kind': 'training_history'})
+                # Emit prediction vs. actual series
+                self.websocket_manager.emit_series(session_id, series=series_predictions, meta={'kind': 'predictions_vs_actual'})
+            except Exception as viz_err:
+                self.logger.warning("series_emit_failed", error=str(viz_err))
+
+            # Save model state
+            self._save_state()
+
+            # Calculate final metrics
+            final_accuracy = test_metrics.get('r2', 0)
+            final_loss = history.history['loss'][-1] if history.history.get('loss') else 0
+
+            # Log completion
             training_duration = (datetime.now() - training_start_time).total_seconds()
             self.logger.info("training_completed", 
-                           ticker=ticker_symbol,
+                           ticker=ticker_symbol, 
                            duration=training_duration,
                            train_metrics=train_metrics,
                            test_metrics=test_metrics)
 
-            # After successful training, save the model and processor state
-            self._save_state()
+            # Emit completion using new system
+            final_data = {
+                'message': f'Training completed successfully! Final accuracy: {final_accuracy:.4f}',
+                'epoch': self.config.epochs,
+                'total_epochs': self.config.epochs,
+                'final_accuracy': round(final_accuracy, 4),
+                'final_loss': round(final_loss, 4),
+                'r2_score': round(test_metrics.get('r2', 0), 4),
+                'mae': round(test_metrics.get('mae', 0), 4),
+                'rmse': round(test_metrics.get('rmse', 0), 4),
+                'mape': round(test_metrics.get('mape', 0), 4),
+                'training_duration': round(training_duration, 2)
+            }
             
-            # After training completes
-            self.websocket_manager.socketio.sleep(2)  # Pause before evaluation
-
-            # After evaluation completes
-            self.websocket_manager.socketio.sleep(2)  # Pause before visualization
+            self.websocket_manager.emit_completion(session_id, final_data)
 
             return {
+                'history': history.history,
                 'train_metrics': train_metrics,
                 'test_metrics': test_metrics,
-                'plots': plots,
-                'history': {
-                    'loss': [float(x) for x in history.history['loss']],
-                    'val_loss': [float(x) for x in history.history['val_loss']]
-                },
-                'training_duration': training_duration
+                'model_path': str(LATEST_MODEL_PATH)
             }
 
         except Exception as e:
-            self.logger.error("training_failed", 
-                            ticker=ticker_symbol,
-                            error=str(e),
-                            exc_info=True)
+            self.logger.error("training_failed", error=str(e), exc_info=True)
             raise
 
     def _save_state(self):
@@ -734,5 +529,120 @@ class CryptoPredictor:
                             error=str(e),
                             exc_info=True)
             raise
+
+    def _generate_specific_plot(self, plot_name: str, history, y_train, y_pred_train, y_test, y_pred_test, original_prices, session_id: str):
+        """Generate a specific plot with progress tracking"""
+        try:
+            # Lazy import visualizer to avoid heavy imports
+            from .visualization.visualizer import Visualizer
+            
+            # Denormalize predictions
+            if hasattr(self.data_processor, 'mean') and hasattr(self.data_processor, 'std'):
+                mean = self.data_processor.mean
+                std = self.data_processor.std
+                
+                # Handle multi-feature case
+                if isinstance(mean, (list, tuple, np.ndarray)):
+                    mean_target = float(np.array(mean)[-1])
+                    std_target = float(np.array(std)[-1])
+                else:
+                    mean_target = float(mean)
+                    std_target = float(std)
+                
+                y_pred_train_denorm = y_pred_train.flatten() * std_target + mean_target
+                y_pred_test_denorm = y_pred_test.flatten() * std_target + mean_target
+                y_train_denorm = y_train.flatten() * std_target + mean_target
+                y_test_denorm = y_test.flatten() * std_target + mean_target
+            else:
+                y_pred_train_denorm = y_pred_train.flatten()
+                y_pred_test_denorm = y_pred_test.flatten()
+                y_train_denorm = y_train.flatten()
+                y_test_denorm = y_test.flatten()
+            
+            train_size = len(y_train)
+            lookback = self.config.lookback
+            
+            # Generate specific plot based on name
+            if plot_name == 'training_history':
+                return Visualizer.plot_training_history(history, ax=None)
+            elif plot_name == 'predictions_vs_actual':
+                return Visualizer.plot_predictions_vs_actual(
+                    y_train_denorm, y_pred_train_denorm, 
+                    y_test_denorm, y_pred_test_denorm, ax=None
+                )
+            elif plot_name == 'residuals':
+                return Visualizer.plot_residuals(
+                    y_train_denorm, y_pred_train_denorm, 
+                    y_test_denorm, y_pred_test_denorm, ax=None
+                )
+            elif plot_name == 'price_predictions':
+                return Visualizer.plot_predictions(
+                    original_prices, y_pred_train_denorm, y_pred_test_denorm,
+                    train_size, lookback, mean_target, std_target, ax=None
+                )
+            elif plot_name == 'feature_importance':
+                return Visualizer.plot_feature_importance(
+                    y_train_denorm, y_pred_train_denorm, ax=None
+                )
+            elif plot_name == 'model_performance':
+                return Visualizer.plot_model_performance(
+                    y_train_denorm, y_pred_train_denorm,
+                    y_test_denorm, y_pred_test_denorm, ax=None
+                )
+            elif plot_name == 'data_distribution':
+                return Visualizer.plot_data_distribution(
+                    y_train_denorm, y_test_denorm, ax=None
+                )
+            elif plot_name == 'correlation_matrix':
+                return Visualizer.plot_correlation_matrix(
+                    y_train_denorm, y_pred_train_denorm, ax=None
+                )
+            elif plot_name == 'rolling_metrics':
+                return Visualizer.plot_rolling_metrics(
+                    y_test_denorm, y_pred_test_denorm, ax=None
+                )
+            elif plot_name == 'volatility_analysis':
+                return Visualizer.plot_volatility_analysis(
+                    original_prices, ax=None
+                )
+            elif plot_name == 'trend_analysis':
+                return Visualizer.plot_trend_analysis(
+                    original_prices, ax=None
+                )
+            elif plot_name == 'seasonality':
+                return Visualizer.plot_seasonality(
+                    original_prices, ax=None
+                )
+            elif plot_name == 'forecast':
+                return Visualizer.plot_forecast(
+                    original_prices, y_pred_test_denorm, ax=None
+                )
+            else:
+                self.logger.warning(f"Unknown plot type: {plot_name}")
+                return None
+                
+        except Exception as e:
+            self.logger.error(f"Failed to generate {plot_name} plot", error=str(e))
+            return None
+
+    def _generate_visualizations(self, history, y_train, y_pred_train, y_test, y_pred_test, original_prices, session_id: str):
+        """Generate all visualizations (legacy method for backward compatibility)"""
+        plots = {}
+        plot_names = [
+            'training_history', 'predictions_vs_actual', 'residuals', 
+            'price_predictions', 'feature_importance', 'model_performance',
+            'data_distribution', 'correlation_matrix', 'rolling_metrics',
+            'volatility_analysis', 'trend_analysis', 'seasonality', 'forecast'
+        ]
+        
+        for plot_name in plot_names:
+            plot_data = self._generate_specific_plot(
+                plot_name, history, y_train, y_pred_train, y_test, y_pred_test, 
+                original_prices, session_id
+            )
+            if plot_data:
+                plots[plot_name] = plot_data
+        
+        return plots
 
 

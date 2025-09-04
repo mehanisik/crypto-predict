@@ -1,24 +1,24 @@
 "use client";
 import React, { useEffect, useRef, memo } from "react";
 import { useTheme } from "next-themes";
-import { TradingViewSymbols } from "@/constants/trading-view-symbols.constant";
+import type { TradingViewSymbols } from "@/constants/trading-view-symbols.constant";
 
 function TradingViewWidget({ symbol }: { symbol: TradingViewSymbols }) {
-  const container = useRef<HTMLDivElement | null>(null);
-  const { theme } = useTheme();
+	const container = useRef<HTMLDivElement | null>(null);
+	const { theme } = useTheme();
 
-  useEffect(() => {
-    if (container.current) {
-      container.current.innerHTML = "";
-    }
+	useEffect(() => {
+		if (container.current) {
+			container.current.innerHTML = "";
+		}
 
-    const script = document.createElement("script");
-    script.src =
-      "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
-    script.type = "text/javascript";
-    script.async = true;
+		const script = document.createElement("script");
+		script.src =
+			"https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+		script.type = "text/javascript";
+		script.async = true;
 
-    script.innerHTML = `
+		script.innerHTML = `
         {
           "autosize": true,
           "symbol": "${symbol}",
@@ -34,17 +34,17 @@ function TradingViewWidget({ symbol }: { symbol: TradingViewSymbols }) {
           "calendar": false,
           "support_host": "https://www.tradingview.com"
         }`;
-    container.current?.appendChild(script);
-  }, [symbol, theme]);
+		container.current?.appendChild(script);
+	}, [symbol, theme]);
 
-  return (
-    <div
-      className="tradingview-widget-container absolute inset-0"
-      ref={container}
-    >
-      <div className="tradingview-widget-container__widget h-full"></div>
-    </div>
-  );
+	return (
+		<div
+			className="tradingview-widget-container absolute inset-0"
+			ref={container}
+		>
+			<div className="tradingview-widget-container__widget h-full"></div>
+		</div>
+	);
 }
 
 export default memo(TradingViewWidget);

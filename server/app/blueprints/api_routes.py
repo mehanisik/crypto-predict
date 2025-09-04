@@ -28,6 +28,7 @@ from app.utils.exceptions import (
 )
 from app.middleware import rate_limit
 from app import db, socketio
+from ml_app.visualization.visualizer import PLOTS_DIR, plot_manager
 
 api = Api(api_bp)
 logger = get_logger(__name__)
@@ -1127,6 +1128,112 @@ class RunningTrainingsResource(Resource):
             }, 500
 
 
+class WebSocketTestResource(Resource):
+    """Test endpoint to emit sample WebSocket messages to a training room."""
+
+    @swag_from({
+        'tags': ['Debug'],
+        'summary': 'Emit test WebSocket messages',
+        'description': 'Sends a sample WebSocket event to a training session room for client testing',
+        'parameters': [
+            {
+                'name': 'body',
+                'in': 'body',
+                'required': True,
+                'schema': {
+                    'type': 'object',
+                    'properties': {
+                        'session_id': {'type': 'string', 'example': 'train_123'},
+                        'kind': {
+                            'type': 'string',
+                            'enum': ['metric', 'series', 'complete'],
+                            'example': 'metric'
+                        },
+                        'epoch': {'type': 'integer', 'example': 1},
+                        'total_epochs': {'type': 'integer', 'example': 10}
+                    },
+                    'required': ['session_id', 'kind']
+                }
+            }
+        ],
+        'responses': {
+            200: {
+                'description': 'WebSocket message sent successfully',
+                'schema': {
+                    'type': 'object',
+                    'properties': {
+                        'success': {'type': 'boolean', 'example': True},
+                        'message': {'type': 'string', 'example': 'WebSocket message sent'},
+                        'session_id': {'type': 'string', 'example': 'train_123'},
+                        'kind': {'type': 'string', 'example': 'metric'}
+                    }
+                }
+            }
+        }
+    })
+    def post(self):
+        """Emit a test WebSocket message to a training room."""
+        try:
+            from app.services.training_service import TrainingService
+            from ml_app.websocket.manager import WebSocketManager
+
+            data = request.get_json()
+            if not data:
+                return {'error': 'No JSON data provided'}, 400
+
+            session_id = data.get('session_id')
+            kind = data.get('kind', 'metric')
+
+            if not session_id:
+                return {'error': 'session_id is required'}, 400
+
+            # Create WebSocket manager
+            from app import socketio
+            ws_manager = WebSocketManager(socketio)
+
+            # Emit test message based on kind
+            if kind == 'metric':
+                epoch = data.get('epoch', 1)
+                total_epochs = data.get('total_epochs', 10)
+                ws_manager.emit_metric_sample(session_id, epoch, total_epochs)
+            elif kind == 'series':
+                # Emit a sample series
+                sample_series = {
+                    'loss': [0.8, 0.6, 0.4, 0.3, 0.2, 0.1],
+                    'accuracy': [0.5, 0.6, 0.7, 0.75, 0.8, 0.85],
+                    'val_loss': [0.9, 0.7, 0.5, 0.4, 0.3, 0.2],
+                    'val_accuracy': [0.4, 0.5, 0.6, 0.65, 0.7, 0.75]
+                }
+                ws_manager.emit_series(session_id, series=sample_series)
+            elif kind == 'complete':
+                # Emit completion
+                ws_manager.emit_completion(session_id, {
+                    'final_accuracy': 0.85,
+                    'final_loss': 0.1,
+                    'r2_score': 0.92,
+                    'mae': 150.5,
+                    'rmse': 180.2,
+                    'mape': 15.5
+                })
+            else:
+                return {'error': f'Unknown kind: {kind}'}, 400
+
+            return {
+                'success': True,
+                'message': 'WebSocket message sent',
+                'session_id': session_id,
+                'kind': kind
+            }, 200
+
+        except Exception as e:
+            logger.error("websocket_test_error", error=str(e), exc_info=True)
+            return {
+                'error': 'Internal server error',
+                'error_code': 'INTERNAL_ERROR',
+                'message': 'Failed to send WebSocket message'
+            }, 500
+
+
 # Register resources
 api.add_resource(HealthCheckResource, '/health')
 api.add_resource(PredictionResource, '/predict')
@@ -1134,4 +1241,60 @@ api.add_resource(TrainingResource, '/train')
 api.add_resource(TrainingStatusResource, '/train/<string:session_id>/status')
 api.add_resource(TrainingCancelResource, '/train/<string:session_id>/cancel')
 api.add_resource(RunningTrainingsResource, '/train/running')
+api.add_resource(WebSocketTestResource, '/ws/test')
+
+
+class RecentPlotsResource(Resource):
+    """List recent generated plot image URLs."""
+
+    @rate_limit('default')
+    @swag_from({
+        'tags': ['Visualizations'],
+        'summary': 'Get recent plot images',
+        'description': 'Returns the most recently generated plot image URLs.',
+        'parameters': [
+            {
+                'name': 'limit',
+                'in': 'query',
+                'type': 'integer',
+                'required': False,
+                'description': 'Maximum number of plots to return (default 8, max 24)',
+                'example': 8
+            }
+        ],
+        'responses': {
+            200: {
+                'description': 'Recent plots',
+                'schema': {
+                    'type': 'object',
+                    'properties': {
+                        'plots': {
+                            'type': 'array',
+                            'items': {'type': 'string', 'example': '/static/plots/abc.png'}
+                        }
+                    }
+                }
+            }
+        }
+    })
+    def get(self):
+        try:
+            # Clean any old plots first (best-effort)
+            plot_manager.cleanup_old_plots()
+
+            try:
+                limit = int(request.args.get('limit', 8))
+            except Exception:
+                limit = 8
+            limit = max(1, min(limit, 24))
+
+            files = list(PLOTS_DIR.glob('*.png'))
+            files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+            urls = [plot_manager.get_plot_url(f.name) for f in files[:limit]]
+            return {'plots': urls}, 200
+        except Exception as e:
+            logger.error('recent_plots_error', error=str(e), exc_info=True)
+            return {'error': 'Failed to list recent plots'}, 500
+
+api.add_resource(RecentPlotsResource, '/plots/recent')
 

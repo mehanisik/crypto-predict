@@ -3,24 +3,90 @@ import seaborn as sns
 from scipy import stats
 import numpy as np
 import pandas as pd
-from typing import Dict, List
+from typing import Dict, List, Optional
 from functools import wraps
 import io
-import base64
-from datetime import datetime
+import os
+import uuid
+from datetime import datetime, timedelta
 import matplotlib.dates as mdates
+from pathlib import Path
+
+# Create plots directory if it doesn't exist
+PLOTS_DIR = Path("/app/static/plots")
+PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+
+class PlotManager:
+    """Manages plot file storage and cleanup"""
+    
+    def __init__(self, max_age_hours: int = 24, max_files: int = 100):
+        self.max_age_hours = max_age_hours
+        self.max_files = max_files
+    
+    def cleanup_old_plots(self):
+        """Clean up plot files older than max_age_hours or exceeding max_files"""
+        try:
+            cutoff_time = datetime.now() - timedelta(hours=self.max_age_hours)
+            files = list(PLOTS_DIR.glob("*.png"))
+            
+            # Remove old files
+            for file_path in files:
+                if file_path.stat().st_mtime < cutoff_time.timestamp():
+                    file_path.unlink()
+            
+            # If still too many files, remove oldest ones
+            files = list(PLOTS_DIR.glob("*.png"))
+            if len(files) > self.max_files:
+                files.sort(key=lambda x: x.stat().st_mtime)
+                for file_path in files[:-self.max_files]:
+                    file_path.unlink()
+                    
+        except Exception as e:
+            print(f"Error cleaning up old plots: {e}")
+    
+    def get_plot_url(self, filename: str) -> str:
+        """Get the URL for a plot file"""
+        return f"/static/plots/{filename}"
+    
+    def create_plot_filename(self) -> str:
+        """Create a unique plot filename"""
+        return f"{uuid.uuid4()}.png"
+
+# Global plot manager instance
+plot_manager = PlotManager()
+
+def cleanup_old_plots(max_age_hours: int = 24):
+    """Clean up plot files older than max_age_hours"""
+    plot_manager.cleanup_old_plots()
 
 def create_plot(func):
-    """Standalone decorator to create and encode matplotlib plots"""
+    """Decorator to create and save matplotlib plots as files"""
     def wrapper(*args, **kwargs):
-        fig, ax = plt.subplots(figsize=(10, 6))
-        kwargs['ax'] = ax
-        func(*args, **kwargs)
-        buf = io.BytesIO()
-        fig.savefig(buf, format='png', dpi=300, bbox_inches='tight')
-        plt.close(fig)
-        buf.seek(0)
-        return base64.b64encode(buf.getvalue()).decode('utf-8')
+        try:
+            # Clean up old plots before creating new ones
+            plot_manager.cleanup_old_plots()
+            
+            # Close any existing figures to prevent memory leaks
+            plt.close('all')
+            
+            fig, ax = plt.subplots(figsize=(10, 6))
+            kwargs['ax'] = ax
+            func(*args, **kwargs)
+            
+            # Generate unique filename
+            filename = plot_manager.create_plot_filename()
+            filepath = PLOTS_DIR / filename
+            
+            # Save plot as file with optimized settings
+            fig.savefig(filepath, format='png', dpi=150, bbox_inches='tight')
+            plt.close(fig)
+            
+            # Return URL instead of base64
+            return plot_manager.get_plot_url(filename)
+        except Exception as e:
+            # Ensure figure is closed even if there's an error
+            plt.close('all')
+            raise e
     return wrapper
 
 class Visualizer:
@@ -231,20 +297,7 @@ class Visualizer:
         ax.legend()
         ax.grid(True)
 
-    @staticmethod
-    @create_plot
-    def plot_residuals(actual: np.ndarray, predicted: np.ndarray, ax: plt.Axes) -> None:
-        """Plot prediction residuals."""
-        residuals = actual - predicted
-        
-        # Scatter plot of residuals
-        ax.scatter(predicted, residuals, alpha=0.5)
-        ax.axhline(y=0, color='r', linestyle='--')
-        
-        ax.set_title('Residuals Plot')
-        ax.set_xlabel('Predicted Values')
-        ax.set_ylabel('Residuals')
-        ax.grid(True)
+
 
     @staticmethod
     @create_plot
@@ -396,29 +449,47 @@ class Visualizer:
     def plot_prediction_error_by_volatility(y_true: np.ndarray, y_pred: np.ndarray, ax: plt.Axes,
                                           prices: np.ndarray, window: int = 20) -> None:
         """Plot prediction error vs volatility."""
-        # Calculate volatility
-        returns = np.diff(prices) / prices[:-1]
-        volatility = pd.Series(returns).rolling(window=window).std() * np.sqrt(252)
-        
-        # Calculate prediction errors
-        errors = np.abs(y_true - y_pred)
-        
-        # Remove NaN values from volatility calculation
-        valid_idx = ~np.isnan(volatility)
-        volatility = volatility[valid_idx]
-        errors = errors[valid_idx]
-        
-        # Plot scatter
-        ax.scatter(volatility, errors, alpha=0.5)
-        
-        # Add trend line
-        z = np.polyfit(volatility, errors, 1)
-        p = np.poly1d(z)
-        ax.plot(volatility, p(volatility), "r--", alpha=0.8, 
-                label=f'Trend (slope: {z[0]:.2f})')
-        
-        ax.set_title('Prediction Error vs Volatility')
-        ax.set_xlabel('Volatility')
-        ax.set_ylabel('Absolute Prediction Error')
-        ax.legend()
-        ax.grid(True)
+        try:
+            # Ensure arrays have the same length
+            min_length = min(len(y_true), len(y_pred), len(prices))
+            y_true = y_true[:min_length]
+            y_pred = y_pred[:min_length]
+            prices = prices[:min_length]
+            
+            # Calculate volatility
+            returns = np.diff(prices) / prices[:-1]
+            volatility = pd.Series(returns).rolling(window=window).std() * np.sqrt(252)
+            
+            # Calculate prediction errors
+            errors = np.abs(y_true - y_pred)
+            
+            # Remove NaN values from volatility calculation
+            valid_idx = ~np.isnan(volatility)
+            volatility = volatility[valid_idx]
+            errors = errors[valid_idx]
+            
+            # Ensure we have enough data points
+            if len(volatility) < 2 or len(errors) < 2:
+                ax.text(0.5, 0.5, 'Insufficient data for volatility analysis', 
+                       ha='center', va='center', transform=ax.transAxes)
+                ax.set_title('Prediction Error vs Volatility')
+                return
+            
+            # Plot scatter
+            ax.scatter(volatility, errors, alpha=0.5)
+            
+            # Add trend line
+            z = np.polyfit(volatility, errors, 1)
+            p = np.poly1d(z)
+            ax.plot(volatility, p(volatility), "r--", alpha=0.8, 
+                    label=f'Trend (slope: {z[0]:.2f})')
+            
+            ax.set_title('Prediction Error vs Volatility')
+            ax.set_xlabel('Volatility')
+            ax.set_ylabel('Absolute Prediction Error')
+            ax.legend()
+            ax.grid(True)
+        except Exception as e:
+            ax.text(0.5, 0.5, f'Error: {str(e)}', 
+                   ha='center', va='center', transform=ax.transAxes)
+            ax.set_title('Prediction Error vs Volatility')

@@ -1,6 +1,8 @@
 """Flask application factory for crypto prediction API."""
 
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
+import threading
+import time
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_socketio import SocketIO
@@ -96,6 +98,33 @@ def create_app(config_name=None):
     
     register_websocket_handlers(socketio)
     
+    # Register static file serving for plots
+    @app.route('/static/plots/<filename>')
+    def serve_plot(filename):
+        """Serve plot files from the static/plots directory"""
+        try:
+            return send_from_directory('/app/static/plots', filename)
+        except FileNotFoundError:
+            return {'error': 'Plot not found'}, 404
+        except Exception as e:
+            logger.error(f"Error serving plot {filename}: {e}")
+            return {'error': 'Internal server error'}, 500
+    
+    # Start background cleanup task for plot files
+    def cleanup_plots_background():
+        """Background task to clean up old plot files"""
+        while True:
+            try:
+                from ml_app.visualization.visualizer import plot_manager
+                plot_manager.cleanup_old_plots()
+                time.sleep(3600)  # Run every hour
+            except Exception as e:
+                logger.error(f"Plot cleanup error: {e}")
+                time.sleep(3600)
+    
+    cleanup_thread = threading.Thread(target=cleanup_plots_background, daemon=True)
+    cleanup_thread.start()
+    
     try:
         cache.init_app(app)
         logger.info("cache_configured_with_redis")
@@ -107,7 +136,6 @@ def create_app(config_name=None):
     
     jwt.init_app(app)
     
-    # Configure Flask-Limiter with Redis storage
     global limiter
     try:
         limiter = Limiter(
@@ -216,12 +244,19 @@ def create_celery_app(app):
     # Use modern Celery keys and filter out deprecated settings
     celery_config = {}
     for k, v in app.config.items():
-        if k.isupper() and k not in ['CELERY_BROKER_URL', 'CELERY_RESULT_BACKEND']:
+        # Exclude Celery keys we are going to set explicitly and legacy/deprecated keys
+        if k.isupper() and k not in [
+            'CELERY_BROKER_URL',
+            'CELERY_RESULT_BACKEND',
+            'BROKER_URL',
+            'RESULT_BACKEND',
+        ]:
             celery_config[k] = v
     
     celery.conf.update(
-        broker_url=app.config.get('BROKER_URL'),
-        result_backend=app.config.get('RESULT_BACKEND'),
+        # Prefer modern keys if present, fall back to legacy for backwards-compat
+        broker_url=app.config.get('CELERY_BROKER_URL') or app.config.get('BROKER_URL'),
+        result_backend=app.config.get('CELERY_RESULT_BACKEND') or app.config.get('RESULT_BACKEND'),
         **celery_config
     )
     

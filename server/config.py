@@ -32,8 +32,12 @@ class BaseConfig:
     REDIS_URL: str = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     
     # Celery settings (modern keys only)
-    BROKER_URL: str = os.getenv('BROKER_URL', 'redis://localhost:6379/1')
-    RESULT_BACKEND: str = os.getenv('RESULT_BACKEND', 'redis://localhost:6379/2')
+    # Prefer modern Celery setting names; fall back to legacy env vars if present
+    CELERY_BROKER_URL: str = os.getenv('CELERY_BROKER_URL', os.getenv('BROKER_URL', 'redis://localhost:6379/1'))
+    CELERY_RESULT_BACKEND: str = os.getenv('CELERY_RESULT_BACKEND', os.getenv('RESULT_BACKEND', 'redis://localhost:6379/2'))
+    # Keep legacy keys for backward compatibility in the rest of the app (if any)
+    BROKER_URL: str = os.getenv('BROKER_URL', CELERY_BROKER_URL)
+    RESULT_BACKEND: str = os.getenv('RESULT_BACKEND', CELERY_RESULT_BACKEND)
     
     # Rate limiting
     RATELIMIT_DEFAULT: str = os.getenv('RATELIMIT_DEFAULT', '100 per minute')

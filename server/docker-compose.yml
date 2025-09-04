@@ -15,8 +15,8 @@ services:
       - POLYGON_API_KEY=${POLYGON_API_KEY}
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
-      - BROKER_URL=redis://redis:6379/1
-      - RESULT_BACKEND=redis://redis:6379/2
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
       - RATELIMIT_STORAGE_URL=redis://redis:6379/3
     depends_on:
       - db
@@ -50,8 +50,8 @@ services:
       - POLYGON_API_KEY=${POLYGON_API_KEY}
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
-      - BROKER_URL=redis://redis:6379/1
-      - RESULT_BACKEND=redis://redis:6379/2
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
     depends_on:
       - db
       - redis
@@ -74,8 +74,8 @@ services:
       - POLYGON_API_KEY=${POLYGON_API_KEY}
       - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379/0
-      - BROKER_URL=redis://redis:6379/1
-      - RESULT_BACKEND=redis://redis:6379/2
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/2
     depends_on:
       - db
       - redis

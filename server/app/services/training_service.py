@@ -160,12 +160,145 @@ class TrainingService:
         loss = float(result['history']['loss'][-1]) if 'history' in result and result['history'].get('loss') else None
 
         self._update_training_progress(session_id, epochs, 100, accuracy or 0.0, loss or 0.0)
+
+        # Emit raw numeric series for client-side charts when available
+        try:
+            series_payload: Dict[str, Any] = {}
+            if isinstance(result, dict):
+                history = result.get('history', {})
+                if isinstance(history, dict):
+                    if isinstance(history.get('loss'), list) and all(isinstance(x, (int, float)) for x in history['loss']):
+                        series_payload['loss'] = [float(x) for x in history['loss']]
+                    if isinstance(history.get('val_loss'), list) and all(isinstance(x, (int, float)) for x in history['val_loss']):
+                        series_payload['val_loss'] = [float(x) for x in history['val_loss']]
+                    if isinstance(history.get('accuracy'), list) and all(isinstance(x, (int, float)) for x in history['accuracy']):
+                        series_payload['accuracy'] = [float(x) for x in history['accuracy']]
+                    if isinstance(history.get('val_accuracy'), list) and all(isinstance(x, (int, float)) for x in history['val_accuracy']):
+                        series_payload['val_accuracy'] = [float(x) for x in history['val_accuracy']]
+
+                # Optional: rolling metrics
+                rolling = result.get('rolling')
+                if isinstance(rolling, dict):
+                    for key in ('mae', 'rmse'):
+                        if isinstance(rolling.get(key), list) and all(isinstance(x, (int, float)) for x in rolling[key]):
+                            series_payload[key] = [float(x) for x in rolling[key]]
+
+                # Optional: predictions and originals (denormalized later on client with mean/std)
+                for key in ('train_pred', 'test_pred', 'original_prices'):
+                    if isinstance(result.get(key), list) and all(isinstance(x, (int, float)) for x in result[key]):
+                        series_payload[key] = [float(x) for x in result[key]]
+                # Metadata helpful for denormalization and alignment
+                for key in ('train_size', 'lookback'):
+                    if isinstance(result.get(key), int):
+                        series_payload[key] = int(result[key])
+                for key in ('mean', 'std'):
+                    if isinstance(result.get(key), (int, float)):
+                        series_payload[key] = float(result[key])
+
+                # Optional: residuals, returns, volatility, etc.
+                for key in ('residuals', 'returns', 'volatility'):
+                    if isinstance(result.get(key), list) and all(isinstance(x, (int, float)) for x in result[key]):
+                        series_payload[key] = [float(x) for x in result[key]]
+
+                # Optional: confidence intervals
+                conf = result.get('confidence_intervals')
+                if isinstance(conf, list):
+                    # Expect list of { timestamp, predicted_value, lower_bound, upper_bound }
+                    timestamps: list[str] = []
+                    pred_values: list[float] = []
+                    lower_bounds: list[float] = []
+                    upper_bounds: list[float] = []
+                    for item in conf:
+                        if not isinstance(item, dict):
+                            continue
+                        ts = item.get('timestamp')
+                        pv = item.get('predicted_value')
+                        lb = item.get('lower_bound')
+                        ub = item.get('upper_bound')
+                        if isinstance(ts, str):
+                            timestamps.append(ts)
+                        else:
+                            # Fallback to index if no timestamp
+                            timestamps.append('')
+                        if isinstance(pv, (int, float)):
+                            pred_values.append(float(pv))
+                        if isinstance(lb, (int, float)):
+                            lower_bounds.append(float(lb))
+                        if isinstance(ub, (int, float)):
+                            upper_bounds.append(float(ub))
+                    if pred_values:
+                        series_payload['ci_timestamps'] = timestamps
+                        series_payload['ci_pred'] = pred_values
+                        series_payload['ci_lower'] = lower_bounds
+                        series_payload['ci_upper'] = upper_bounds
+
+                # If model provided any ready-to-emit numeric series
+                extra_series = result.get('series')
+                if isinstance(extra_series, dict):
+                    for k, v in extra_series.items():
+                        if isinstance(v, list) and all(isinstance(x, (int, float)) for x in v):
+                            series_payload[k] = [float(x) for x in v]
+
+            # Emit in manageable chunks to avoid huge payloads
+            if series_payload:
+                try:
+                    ws_manager.emit_series(session_id, series=series_payload)
+                except Exception:
+                    pass
+        except Exception:
+            logger.warning("emit_series_failed_or_unavailable", session_id=session_id)
         self._update_training_results(session_id, accuracy or 0.0, loss or 0.0,
                                       r2_score=result['test_metrics'].get('r2') if 'test_metrics' in result else None,
                                       mae=result['test_metrics'].get('mae') if 'test_metrics' in result else None,
                                       rmse=result['test_metrics'].get('rmse') if 'test_metrics' in result else None,
                                       mape=result['test_metrics'].get('mape') if 'test_metrics' in result else None)
         self._update_training_status(session_id, TrainingStatus.COMPLETED)
+        
+        # Add smooth transition delay before completion
+        try:
+            socketio.sleep(2.0)  # 2 second delay for smooth transition
+        except Exception:
+            import time
+            time.sleep(2.0)
+        
+        # Emit completion event
+        completion_data = {
+            'type': 'training_completed',
+            'message': f'Training completed successfully! Final accuracy: {accuracy or 0.0:.4f}',
+            'progress': 100,
+            'epoch': epochs,
+            'total_epochs': epochs,
+            'final_accuracy': round(accuracy or 0.0, 4),
+            'final_loss': round(loss or 0.0, 4),
+            'r2_score': round(result['test_metrics'].get('r2', 0), 4) if 'test_metrics' in result else None,
+            'mae': round(result['test_metrics'].get('mae', 0), 4) if 'test_metrics' in result else None,
+            'rmse': round(result['test_metrics'].get('rmse', 0), 4) if 'test_metrics' in result else None,
+            'mape': round(result['test_metrics'].get('mape', 0), 4) if 'test_metrics' in result else None
+        }
+        logger.info("emitting_completion_event", session_id=session_id, data=completion_data)
+        # Backward-compatible emit
+        self._emit_training_update(ws_manager, session_id, completion_data)
+        try:
+            # Also emit unified completion event
+            ws_manager.emit_unified(
+                session_id,
+                phase='complete',
+                event='training_completed',
+                data={
+                    'final_accuracy': completion_data.get('final_accuracy'),
+                    'final_loss': completion_data.get('final_loss'),
+                    'metrics': {
+                        'r2': completion_data.get('r2_score'),
+                        'mae': completion_data.get('mae'),
+                        'rmse': completion_data.get('rmse'),
+                        'mape': completion_data.get('mape')
+                    },
+                    'message': completion_data.get('message')
+                },
+                progress=100
+            )
+        except Exception:
+            pass
     
     def _complete_training_immediately(self, session_id: str, training_data: dict) -> None:
         try:
@@ -206,15 +339,29 @@ class TrainingService:
                 'epoch': 0,
                 'total_epochs': epochs
             })
+            try:
+                ws_manager.emit_unified(
+                    session_id,
+                    phase='train',
+                    event='training_started',
+                    data={'message': f'Training {model_type} model for {ticker} started', 'total_epochs': epochs},
+                    progress=0
+                )
+            except Exception:
+                pass
             
             logger.info("training_progress_simulation", session_id=session_id, epochs=epochs)
             # Simulate up to full number of epochs (cap to a reasonable max in demo)
             max_epochs = min(epochs, 20) or 1
+            acc_series: list[float] = []
+            loss_series: list[float] = []
             for epoch in range(1, max_epochs + 1):
                 try:
                     progress = int((epoch / max_epochs) * 100)
                     current_accuracy = accuracy * (epoch / max_epochs) + random.uniform(-0.02, 0.02)
                     current_loss = loss * (1 - epoch / max_epochs) + random.uniform(-0.02, 0.02)
+                    acc_series.append(round(current_accuracy, 6))
+                    loss_series.append(round(current_loss, 6))
                     
                     logger.info("epoch_progress", session_id=session_id, epoch=epoch, progress=progress)
                     self._emit_training_update(ws_manager, session_id, {
@@ -226,10 +373,20 @@ class TrainingService:
                         'accuracy': round(current_accuracy, 4),
                         'loss': round(current_loss, 4)
                     })
+                    try:
+                        ws_manager.emit_metric_sample(
+                            session_id,
+                            epoch,
+                            max_epochs,
+                            accuracy=current_accuracy,
+                            loss=current_loss
+                        )
+                    except Exception:
+                        pass
                     
                     self._update_training_progress(session_id, epoch, progress, current_accuracy, current_loss)
                     try:
-                        socketio.sleep(1.0)
+                        socketio.sleep(2.0)  # Increased delay for smoother transitions
                     except Exception:
                         import time
                         time.sleep(1.0)
@@ -239,6 +396,15 @@ class TrainingService:
             
             logger.info("training_final_update", session_id=session_id, accuracy=accuracy, loss=loss)
             self._update_training_progress(session_id, max_epochs, 100, accuracy, loss)
+
+            # Emit raw numeric series collected during simulation
+            try:
+                ws_manager.emit_series(session_id, series={
+                    'accuracy': acc_series,
+                    'loss': loss_series
+                })
+            except Exception:
+                pass
             
             self._emit_training_update(None, session_id, {
                 'type': 'training_progress',
@@ -257,15 +423,41 @@ class TrainingService:
             self._update_training_results(session_id, accuracy, loss, r2_score, mae, rmse, mape)
             
             logger.info("training_completion_event", session_id=session_id, accuracy=accuracy)
-            self._emit_training_update(ws_manager, session_id, {
+            completion_data = {
                 'type': 'training_completed',
                 'message': f'Training completed successfully! Final accuracy: {accuracy:.4f}',
                 'progress': 100,
                 'epoch': max_epochs,
                 'total_epochs': max_epochs,
                 'final_accuracy': round(accuracy, 4),
-                'final_loss': round(loss, 4)
-            })
+                'final_loss': round(loss, 4),
+                'r2_score': round(r2_score, 4) if r2_score else None,
+                'mae': round(mae, 4) if mae else None,
+                'rmse': round(rmse, 4) if rmse else None,
+                'mape': round(mape, 4) if mape else None
+            }
+            logger.info("emitting_completion_event", session_id=session_id, data=completion_data)
+            self._emit_training_update(ws_manager, session_id, completion_data)
+            try:
+                ws_manager.emit_unified(
+                    session_id,
+                    phase='complete',
+                    event='training_completed',
+                    data={
+                        'final_accuracy': completion_data.get('final_accuracy'),
+                        'final_loss': completion_data.get('final_loss'),
+                        'metrics': {
+                            'r2': completion_data.get('r2_score'),
+                            'mae': completion_data.get('mae'),
+                            'rmse': completion_data.get('rmse'),
+                            'mape': completion_data.get('mape')
+                        },
+                        'message': completion_data.get('message')
+                    },
+                    progress=100
+                )
+            except Exception:
+                pass
             
         except Exception as e:
             logger.error("training_execution_failed", session_id=session_id, error=str(e), exc_info=True)
