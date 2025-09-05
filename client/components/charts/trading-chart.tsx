@@ -6,12 +6,16 @@ import type { TradingViewSymbols } from "@/constants/trading-view-symbols.consta
 
 function TradingViewWidget({ symbol }: { symbol: TradingViewSymbols }) {
 	const container = useRef<HTMLDivElement | null>(null);
-	const { theme } = useTheme();
+	const { theme, resolvedTheme } = useTheme();
 
 	useEffect(() => {
 		if (container.current) {
 			container.current.innerHTML = "";
 		}
+
+		// Use resolvedTheme to get the actual theme (handles system theme)
+		const currentTheme = resolvedTheme || theme || "dark";
+		const isDark = currentTheme === "dark";
 
 		const script = document.createElement("script");
 		script.src =
@@ -25,7 +29,7 @@ function TradingViewWidget({ symbol }: { symbol: TradingViewSymbols }) {
           "symbol": "${symbol}",
           "interval": "D",
           "timezone": "Etc/UTC",
-          "theme": "${theme === "dark" ? "dark" : "light"}",
+          "theme": "${isDark ? "dark" : "light"}",
           "style": "1",
           "locale": "en",
           "withdateranges": true,
@@ -36,11 +40,11 @@ function TradingViewWidget({ symbol }: { symbol: TradingViewSymbols }) {
           "support_host": "https://www.tradingview.com"
         }`;
 		container.current?.appendChild(script);
-	}, [symbol, theme]);
+	}, [symbol, theme, resolvedTheme]);
 
 	return (
 		<div
-			className="tradingview-widget-container absolute inset-0"
+			className="tradingview-widget-container absolute inset-0 bg-background"
 			ref={container}
 		>
 			<div className="tradingview-widget-container__widget h-full"></div>
