@@ -49,7 +49,6 @@ export function TrainingCharts() {
 
 	return (
 		<div className="h-full flex flex-col space-y-4">
-			{/* Plots Section */}
 			<Card className="flex-1 min-h-0">
 				<CardHeader className="pb-4 flex-shrink-0">
 					<CardTitle className="text-base flex items-center gap-2">
@@ -72,7 +71,6 @@ export function TrainingCharts() {
 				</CardContent>
 			</Card>
 
-			{/* Metrics Section */}
 			<Card className="flex-1 min-h-0">
 				<CardHeader className="pb-4 flex-shrink-0">
 					<CardTitle className="text-base flex items-center gap-2">
@@ -155,7 +153,6 @@ export function TrainingCharts() {
 								</Card>
 							)}
 
-							{/* Accuracy chart */}
 							{(seriesMap.accuracy || seriesMap.val_accuracy) && (
 								<Card>
 									<CardHeader className="pb-3">
@@ -221,7 +218,6 @@ export function TrainingCharts() {
 							)}
 						</div>
 
-						{/* Error Metrics */}
 						{(seriesMap.mae || seriesMap.rmse) && (
 							<Card>
 								<CardHeader className="pb-3">
@@ -276,8 +272,6 @@ export function TrainingCharts() {
 								</CardContent>
 							</Card>
 						)}
-
-						{/* Predictions vs Actuals */}
 						{(seriesMap.original_prices ||
 							seriesMap.train_pred ||
 							seriesMap.test_pred) && (

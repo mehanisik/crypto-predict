@@ -11,7 +11,6 @@ import type {
 
 export const getMarketStats = cache(async (): Promise<MarketData[]> => {
 	try {
-		console.log("getMarketStats has been called");
 		const { data } = await axios.get(`${process.env.NEXT_PUBLIC_CRYPTO_URL}`, {
 			params: {
 				vs_currency: "usd",
@@ -38,7 +37,7 @@ export const getMarketStats = cache(async (): Promise<MarketData[]> => {
 			totalSupply: crypto.total_supply,
 			priceHistory: crypto.sparkline_in_7d.price,
 		}));
-	} catch (error) {
+	} catch (_error) {
 		return [];
 	}
 });

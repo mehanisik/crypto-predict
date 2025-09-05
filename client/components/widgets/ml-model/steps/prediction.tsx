@@ -259,16 +259,16 @@ export function PredictionStep() {
 								</div>
 
 								<div className="max-h-80 overflow-auto space-y-2">
-									{state.result.predictions.map((p, i) => (
+									{state.result.predictions.map((p) => (
 										<div
-											key={i}
+											key={p.date}
 											className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
 										>
 											<div className="flex items-center justify-between mb-2">
 												<div className="flex items-center gap-2">
 													<span className="font-medium text-sm">{p.date}</span>
 													<Badge variant="outline" className="text-xs">
-														Day {i + 1}
+														Day {p.date}
 													</Badge>
 												</div>
 												<div className="text-right">
@@ -282,7 +282,6 @@ export function PredictionStep() {
 												</div>
 											</div>
 
-											{/* Confidence Interval */}
 											<div className="grid grid-cols-3 gap-2 text-xs">
 												<div className="text-center p-2 bg-red-50 dark:bg-red-950/20 rounded">
 													<div className="font-medium text-red-600">

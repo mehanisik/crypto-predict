@@ -12,9 +12,7 @@ import { useMlModelStore } from "@/store";
 
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:5000";
 
-export type { TrainingUpdateEvent as TrainingUpdate } from "@/types/socket";
-
-export interface SocketState {
+interface SocketState {
 	isConnected: boolean;
 	isConnecting: boolean;
 	error: string | null;
@@ -149,7 +147,7 @@ export function useSocket() {
 			const data = normalized.data;
 
 			addMessage({
-				index: Date.now(), 
+				index: Date.now(),
 				timestamp,
 				event: eventName,
 				progress,

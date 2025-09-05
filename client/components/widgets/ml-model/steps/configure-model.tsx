@@ -95,7 +95,6 @@ export function ConfigureModelStep() {
 				</Alert>
 			)}
 
-			{/* Training Presets */}
 			<Card>
 				<CardHeader className="pb-3">
 					<CardTitle className="text-sm">Training Presets</CardTitle>

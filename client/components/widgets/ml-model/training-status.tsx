@@ -36,15 +36,15 @@ export function TrainingStatus() {
 			const m = messages[i];
 			if (m.event === "training_completed" || m.event === "training_complete") {
 				const data = (m.data as Record<string, unknown>) || {};
-				const metrics = (data["metrics"] as Record<string, number>) || {};
+				const metrics = (data.metrics as Record<string, number>) || {};
 				return {
 					final_accuracy:
-						(data["final_accuracy"] as number) ?? metrics["accuracy"],
-					final_loss: (data["final_loss"] as number) ?? metrics["loss"],
-					r2: metrics["r2"],
-					mae: metrics["mae"],
-					rmse: metrics["rmse"],
-					mape: metrics["mape"],
+						(data.final_accuracy as number) ?? metrics.accuracy,
+					final_loss: (data.final_loss as number) ?? metrics.loss,
+					r2: metrics.r2,
+					mae: metrics.mae,
+					rmse: metrics.rmse,
+					mape: metrics.mape,
 				} as {
 					final_accuracy?: number;
 					final_loss?: number;

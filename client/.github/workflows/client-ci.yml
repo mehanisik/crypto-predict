@@ -1,6 +1,8 @@
 name: Client CI/CD
 
 on:
+  repository_dispatch:
+    types: [trigger-client-workflow]
   push:
     branches: [main]
     paths:
@@ -20,54 +22,53 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: "18"
-          cache: "npm"
-          cache-dependency-path: "./client/package-lock.json"
+          bun-version: latest
 
       - name: Install dependencies
-        run: npm ci
+        run: bun install --frozen-lockfile
 
-      - name: Run ESLint
-        run: npm run lint
+      - name: Run Biome lint
+        run: bun run lint
 
       - name: Type check
-        run: npx tsc --noEmit
+        run: bunx tsc --noEmit
 
       - name: Run tests
-        run: npm test || true # Remove '|| true' once you have tests
+        run: bun test || echo "No tests configured yet"
 
       - name: Build
-        run: npm run build
+        run: bun run build
+        env:
+          NEXT_PUBLIC_BASE_URL: ${{ vars.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000' }}
 
   deploy:
     needs: test
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment: production
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
         with:
-          node-version: "18"
-          cache: "npm"
-          cache-dependency-path: "./client/package-lock.json"
+          bun-version: latest
 
       - name: Install dependencies
         run: |
           cd client
-          npm ci
+          bun install --frozen-lockfile
 
       - name: Build
         run: |
           cd client
-          npm run build
+          bun run build
         env:
-          NEXT_PUBLIC_BASE_URL: ${{ secrets.NEXT_PUBLIC_BASE_URL }}
+          NEXT_PUBLIC_BASE_URL: ${{ vars.NEXT_PUBLIC_BASE_URL }}
 
       - name: Deploy to Vercel
         uses: amondnet/vercel-action@v25

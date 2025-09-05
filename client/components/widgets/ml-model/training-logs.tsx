@@ -21,7 +21,7 @@ interface MessageRecord {
 	data?: Record<string, unknown>;
 }
 
-export function TrainingLogs({}) {
+export function TrainingLogs() {
 	const messages = useMlModelStore((s) => s.messages);
 	const autoScroll = useMlModelStore((s) => s.autoScroll);
 	const setAutoScroll = useMlModelStore((s) => s.setAutoScroll);
@@ -121,6 +121,7 @@ export function TrainingLogs({}) {
 						Auto-scroll
 					</label>
 					<button
+						type="button"
 						onClick={clearMessages}
 						className="rounded border px-2 py-1 text-xs hover:bg-muted"
 					>

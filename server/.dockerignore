@@ -1,27 +1,134 @@
 # Version control
 .git
 .gitignore
+.gitattributes
 
 # Python
-__pycache__
-*.pyc
-*.pyo
-*.pyd
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
 .Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
 env/
 venv/
+ENV/
+env.bak/
+venv.bak/
 .env
+.env.local
+.env.development
+.env.test
+.env.production
 
-# IDE
+# IDE and editors
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
+.DS_Store
+Thumbs.db
 
-# Project specific
-models/*
-logs/*
-*.log
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+.hypothesis/
+
+# Documentation
 README.md
-Dockerfile
-docker-compose.yml 
+docs/
+*.md
+LICENSE
+
+# Docker files
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# Logs and temporary files
+logs/
+*.log
+*.tmp
+*.temp
+temp/
+tmp/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Models and data (exclude large files)
+models/
+data/
+*.pkl
+*.pickle
+*.h5
+*.hdf5
+*.joblib
+
+# SSL certificates (should be mounted as volumes)
+ssl/
+
+# Prometheus and monitoring
+prometheus.yml
+grafana/
+
+# Nginx config (should be mounted)
+nginx.conf
+
+# Development files
+.env.example
+.env.template
+*.example
+*.template
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Node.js (if any frontend build artifacts)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig 

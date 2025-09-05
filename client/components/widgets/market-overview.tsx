@@ -13,7 +13,6 @@ import { Widget } from "../ui/widget";
 import { formatNumber, formatPercentage } from "@/lib/utils";
 import { getMarketStats } from "@/lib/actions";
 
-export const revalidate = 60;
 
 export async function MarketOverviewWidget() {
 	const data = await getMarketStats();

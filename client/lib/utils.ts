@@ -20,7 +20,7 @@ export function formatPercentage(value: number): string {
 	return `${value.toFixed(2)}`;
 }
 
-export function formatDate(date: Date): string {
+function formatDate(date: Date): string {
 	return date.toLocaleDateString("en-US", {
 		year: "numeric",
 		month: "short",
@@ -28,7 +28,7 @@ export function formatDate(date: Date): string {
 	});
 }
 
-export function formatPrice(price: number): string {
+function formatPrice(price: number): string {
 	return new Intl.NumberFormat("en-US", {
 		style: "currency",
 		currency: "USD",

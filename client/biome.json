@@ -7,7 +7,7 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["**/*.ts", "**/*.tsx", "!node_modules", ".next"]
+		"includes": ["**/*.ts", "**/*.tsx", "!node_modules", "!.next"]
 	},
 	"formatter": {
 		"enabled": true,
@@ -18,7 +18,7 @@
 			"**/*.ts",
 			"**/*.tsx",
 			"!node_modules",
-			".next",
+			"!.next",
 			"!components/ui/**"
 		],
 		"enabled": true,

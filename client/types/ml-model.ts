@@ -5,7 +5,7 @@ export const Step = {
 } as const;
 export type Step = (typeof Step)[keyof typeof Step];
 
-export type ModelType = "LSTM" | "CNN" | "CNN-LSTM" | "LSTM-CNN";
+type ModelType = "LSTM" | "CNN" | "CNN-LSTM" | "LSTM-CNN";
 
 export interface TrainingParams {
 	ticker: string;
@@ -61,7 +61,7 @@ export interface PredictionPayload {
 	days: number;
 }
 
-export interface PredictionResultItem {
+interface PredictionResultItem {
 	date: string;
 	price?: number;
 	predicted_price?: number;

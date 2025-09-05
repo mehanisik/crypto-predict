@@ -9,10 +9,10 @@ const trainingSchema = z.object({
 			message: "Ticker must contain only letters, numbers, or hyphens",
 		}),
 	modelType: z.enum(["CNN", "LSTM", "CNN-LSTM", "LSTM-CNN"]),
-	startDate: z.string().refine((value) => !isNaN(Date.parse(value)), {
+	startDate: z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
 		message: "Invalid date",
 	}),
-	endDate: z.string().refine((value) => !isNaN(Date.parse(value)), {
+	endDate: z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
 		message: "Invalid date",
 	}),
 	lookback: z.number().min(10).max(60).default(10),

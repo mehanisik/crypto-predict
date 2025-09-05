@@ -29,7 +29,13 @@ export default function SparkLineChart({
 
 	return (
 		<Card className="p-2">
-			<svg width={width} height={height}>
+			<svg
+				width={width}
+				height={height}
+				role="img"
+				aria-label="Sparkline chart"
+			>
+				<title>Sparkline chart showing data trend</title>
 				<polyline
 					points={points.join(" ")}
 					fill="none"

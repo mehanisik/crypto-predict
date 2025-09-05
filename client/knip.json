@@ -1,0 +1,27 @@
+{
+  "workspaces": {
+    ".": {
+      "entry": [
+        "app/**/*.{js,ts,jsx,tsx}"
+      ],
+      "project": [
+        "components/**/*.{js,ts,jsx,tsx}",
+        "hooks/**/*.{js,ts,jsx,tsx}",
+        "lib/**/*.{js,ts,jsx,tsx}",
+        "store/**/*.{js,ts,jsx,tsx}",
+        "types/**/*.{js,ts,jsx,tsx}",
+        "schemas/**/*.{js,ts,jsx,tsx}",
+        "constants/**/*.{js,ts,jsx,tsx}"
+      ],
+      "ignore": [
+        "components/ui/**/*",
+        "components/layout/**/*",
+        "components/providers/**/*",
+        "components/theme/**/*"
+      ],
+      "ignoreDependencies": [
+        "postcss-load-config"
+      ]
+    }
+  }
+}

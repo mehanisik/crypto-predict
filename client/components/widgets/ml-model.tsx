@@ -15,11 +15,6 @@ export default function MachineLearningWidget() {
 	const { connection, step, isTrainingComplete, setStep } = useMlModelStore();
 	const socket = useSocket();
 
-	if (!socket) {
-		console.error("❌ Socket object is undefined!");
-		return <div>Socket initialization error</div>;
-	}
-
 	useEffect(() => {
 		if (
 			connection.activeSessionId &&
@@ -37,17 +32,19 @@ export default function MachineLearningWidget() {
 	// Auto-transition to prediction step when training completes
 	useEffect(() => {
 		if (isTrainingComplete && step === Step.Train) {
-			console.log("🎯 Training completed! Transitioning to prediction step...");
 			setStep(Step.Predict);
 		}
 	}, [isTrainingComplete, step, setStep]);
 
+	if (!socket) {
+		return <div>Socket initialization error</div>;
+	}
+
 	return (
 		<Widget
-			title="Machine Learning Mode 2l"
+			title="Machine Learning Model"
 			headerContent={
 				<div className="flex items-center gap-3">
-					{/* Navigation buttons */}
 					{step === Step.Train && isTrainingComplete && (
 						<Button
 							variant="outline"
@@ -82,7 +79,6 @@ export default function MachineLearningWidget() {
 						</Button>
 					)}
 
-					{/* Connection status */}
 					<span
 						className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-xs ${
 							socket?.isConnected

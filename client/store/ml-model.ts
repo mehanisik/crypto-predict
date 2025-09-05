@@ -80,11 +80,11 @@ export const useMlModelStore = create<MlModelState>((set) => ({
 	setTrainingComplete: (v) => set({ isTrainingComplete: v }),
 }));
 
-export const selectConnection = (s: MlModelState) => s.connection;
-export const selectTraining = (s: MlModelState) => s.training;
-export const selectPrediction = (s: MlModelState) => s.prediction;
-export const selectMessages = (s: MlModelState) => s.messages;
-export const selectDerived = (s: MlModelState) => ({
+const _selectConnection = (s: MlModelState) => s.connection;
+const _selectTraining = (s: MlModelState) => s.training;
+const _selectPrediction = (s: MlModelState) => s.prediction;
+const _selectMessages = (s: MlModelState) => s.messages;
+const _selectDerived = (s: MlModelState) => ({
 	step: s.step,
 	isTrainingComplete: s.isTrainingComplete,
 });
