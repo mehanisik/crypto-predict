@@ -1,5 +1,3 @@
-// Socket Event Types for Crypto Prediction App
-
 // Base event interface
 export interface BaseSocketEvent {
 	session_id?: string;
@@ -8,12 +6,10 @@ export interface BaseSocketEvent {
 	error?: string;
 }
 
-// Connection events
 export interface ConnectionEvent extends BaseSocketEvent {
 	status: "connected" | "disconnected";
 }
 
-// Room join/leave events
 export interface RoomEvent extends BaseSocketEvent {
 	session_id: string;
 	status: "joined" | "left";
@@ -24,7 +20,6 @@ export interface PredictionRoomEvent extends BaseSocketEvent {
 	status: "joined" | "left";
 }
 
-// Training stage types
 export type TrainingStage =
 	| "data_fetching"
 	| "data_fetched"
@@ -42,9 +37,9 @@ export type TrainingStage =
 	| "training_completed"
 	| "training_complete"
 	| "idle"
-	| "starting";
+	| "starting"
+	| "unknown";
 
-// Training progress data
 export interface TrainingProgressData {
 	epoch: number;
 	total_epochs: number;
@@ -56,7 +51,6 @@ export interface TrainingProgressData {
 	message: string;
 }
 
-// Training completion data
 export interface TrainingCompletionData {
 	progress: number;
 	epoch: number;
@@ -71,7 +65,6 @@ export interface TrainingCompletionData {
 	message: string;
 }
 
-// Training metrics
 export interface TrainingMetrics {
 	accuracy: number;
 	loss: number;
@@ -81,7 +74,6 @@ export interface TrainingMetrics {
 	mape?: number;
 }
 
-// Server unified message structure
 export interface UnifiedServerMessage {
 	session_id: string;
 	phase:
@@ -100,7 +92,6 @@ export interface UnifiedServerMessage {
 	data: Record<string, unknown>;
 }
 
-// Legacy server message structure
 export interface LegacyServerMessage extends BaseSocketEvent {
 	type?: TrainingStage;
 	data_type?: string; // legacy field
@@ -108,10 +99,8 @@ export interface LegacyServerMessage extends BaseSocketEvent {
 	data?: Record<string, unknown>;
 }
 
-// Combined message type (server sends this)
 export type ServerMessage = UnifiedServerMessage | LegacyServerMessage;
 
-// Training update event (client receives this)
 export interface TrainingUpdateEvent extends BaseSocketEvent {
 	// Unified fields
 	phase?:
@@ -126,11 +115,9 @@ export interface TrainingUpdateEvent extends BaseSocketEvent {
 		| "error";
 	event?: string; // unified event name
 
-	// Legacy fields for backward compatibility
 	type?: TrainingStage;
 	data_type?: string;
 
-	// Progress and metrics
 	progress?: number;
 	epoch?: number;
 	total_epochs?: number;
@@ -144,27 +131,23 @@ export interface TrainingUpdateEvent extends BaseSocketEvent {
 	rmse?: number;
 	mape?: number;
 
-	// Data payloads
 	data?:
 		| TrainingProgressData
 		| TrainingCompletionData
 		| Record<string, unknown>;
-	metrics?: Record<string, number>; // server sends actual numbers
+	metrics?: Record<string, number>;
 	series?: Record<string, number[]>;
 
-	// Status
 	status?: "training" | "completed" | "failed";
 	message?: string;
 }
 
-// Error event
 export interface ErrorEvent extends BaseSocketEvent {
 	message: string;
 	code?: string;
 	details?: Record<string, unknown>;
 }
 
-// Prediction events
 export interface PredictionUpdateEvent extends BaseSocketEvent {
 	type:
 		| "prediction_started"
@@ -181,7 +164,6 @@ export interface PredictionUpdateEvent extends BaseSocketEvent {
 	message: string;
 }
 
-// WebSocket state
 export interface WebSocketState {
 	isConnected: boolean;
 	isConnecting: boolean;
@@ -191,7 +173,6 @@ export interface WebSocketState {
 	connectionAttempts: number;
 }
 
-// Socket event names
 export type SocketEventName =
 	| "connect"
 	| "disconnect"
@@ -210,9 +191,19 @@ export type SocketEventName =
 	| "reconnect"
 	| "reconnect_attempt"
 	| "reconnect_error"
-	| "reconnect_failed";
+	| "reconnect_failed"
+	// Individual stage events (legacy support)
+	| "data_fetching"
+	| "data_fetched"
+	| "preprocessing"
+	| "feature_engineering"
+	| "model_building"
+	| "model_info"
+	| "training_progress"
+	| "evaluating_update"
+	| "visualizing_update"
+	| "training_completed";
 
-// Training configuration
 export interface TrainingConfig {
 	ticker: string;
 	modelType: "CNN" | "LSTM" | "CNN-LSTM" | "LSTM-CNN";
@@ -224,7 +215,6 @@ export interface TrainingConfig {
 	learningRate: number;
 }
 
-// Training request (API)
 export interface TrainingRequest {
 	ticker: string;
 	model_type: "CNN" | "LSTM" | "CNN-LSTM" | "LSTM-CNN";
@@ -236,7 +226,6 @@ export interface TrainingRequest {
 	learning_rate: number;
 }
 
-// Training response
 export interface TrainingResponse {
 	success: boolean;
 	message: string;
@@ -244,14 +233,12 @@ export interface TrainingResponse {
 	error?: string;
 }
 
-// Prediction request
 export interface PredictionRequest {
 	ticker: string;
 	start_date: string;
 	days: number;
 }
 
-// Prediction response
 export interface PredictionResponse {
 	success: boolean;
 	message: string;
@@ -262,5 +249,3 @@ export interface PredictionResponse {
 	}>;
 	error?: string;
 }
-
-// These interfaces are already exported above

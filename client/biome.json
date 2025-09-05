@@ -14,7 +14,13 @@
 		"indentStyle": "tab"
 	},
 	"linter": {
-		"includes": ["**/*.ts", "**/*.tsx", "!node_modules", ".next","!components/ui/**"],
+		"includes": [
+			"**/*.ts",
+			"**/*.tsx",
+			"!node_modules",
+			".next",
+			"!components/ui/**"
+		],
 		"enabled": true,
 		"rules": {
 			"recommended": true

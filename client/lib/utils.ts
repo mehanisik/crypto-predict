@@ -1,4 +1,3 @@
-import { ModelStages } from "@/constants/model-stages.constant";
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
@@ -20,13 +19,6 @@ export function formatNumber(num?: number): string {
 export function formatPercentage(value: number): string {
 	return `${value.toFixed(2)}`;
 }
-
-export const getStageValue = (stage: ModelStages): string =>
-	stage.toLowerCase();
-
-export const isValidStage = (stage: string): stage is ModelStages => {
-	return Object.values(ModelStages).includes(stage as ModelStages);
-};
 
 export function formatDate(date: Date): string {
 	return date.toLocaleDateString("en-US", {

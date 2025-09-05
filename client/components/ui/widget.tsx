@@ -37,7 +37,10 @@ export function Widget({
 			>
 				<header className={`p-4 pb-0`}>
 					<div className="flex items-center justify-between">
-						<h2 id={id ? `${id}-title` : undefined} className="text-lg font-semibold tracking-tight">
+						<h2
+							id={id ? `${id}-title` : undefined}
+							className="text-lg font-semibold tracking-tight"
+						>
 							{title}
 						</h2>
 						<div className="flex items-center gap-2">
@@ -56,7 +59,11 @@ export function Widget({
 						</div>
 					</div>
 				</header>
-				<div className={`flex-1 p-4 pt-3 overflow-hidden ${contentClassName ?? ""}`}>{children}</div>
+				<div
+					className={`flex-1 p-4 pt-3 overflow-hidden ${contentClassName ?? ""}`}
+				>
+					{children}
+				</div>
 
 				<Dialog open={isExpanded} onOpenChange={setIsExpanded}>
 					<DialogContent className="max-w-[95vw] w-[95vw] h-[90vh] flex flex-col">

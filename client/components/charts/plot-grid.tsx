@@ -2,59 +2,94 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Maximize2 } from "lucide-react";
+import { Maximize2, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { DialogTitle } from "@radix-ui/react-dialog";
 
 interface PlotGridProps {
-	plots: Record<string, string>; // Now contains URLs instead of base64
+	plots: Record<string, string>;
 }
 
 export function PlotGrid({ plots }: PlotGridProps) {
 	const [selectedPlot, setSelectedPlot] = useState<string | null>(null);
+	const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+
+	const handleImageError = (key: string) => {
+		setImageErrors((prev) => new Set(prev).add(key));
+	};
+
+	if (Object.keys(plots).length === 0) {
+		return (
+			<div className="flex items-center justify-center h-32 text-muted-foreground">
+				<div className="text-center">
+					<AlertCircle className="h-8 w-8 mx-auto mb-2" />
+					<p className="text-sm">No plots available</p>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<>
-			<div className="grid grid-cols-2 md:grid-cols-4 gap-2 h-full">
-				{Object.entries(plots).map(([key, value]) => (
-					<div
-						key={key}
-						className="group relative aspect-square rounded-lg overflow-hidden border bg-background"
-					>
-						<Image
-							src={value} // Now using URL directly
-							alt={key}
-							layout="fill"
-							objectFit="cover"
-							className="transition-transform group-hover:scale-105"
-						/>
-						<div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-							<Button
-								variant="secondary"
-								size="icon"
-								className="h-8 w-8"
-								onClick={() => setSelectedPlot(value)}
-							>
-								<Maximize2 className="h-4 w-4" />
-							</Button>
+			<div className="space-y-4">
+				{Object.entries(plots).map(([key, value]) => {
+					const hasError = imageErrors.has(key);
+
+					return (
+						<div key={key} className="space-y-2">
+							<div className="flex items-center justify-between">
+								<h4 className="text-sm font-medium capitalize">
+									{key.replace(/_/g, " ")}
+								</h4>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => setSelectedPlot(value)}
+									className="h-7 px-2"
+								>
+									<Maximize2 className="h-3 w-3 mr-1" />
+									View
+								</Button>
+							</div>
+							<div className="relative w-full h-64 rounded-lg border bg-background overflow-hidden">
+								{hasError ? (
+									<div className="flex items-center justify-center h-full text-muted-foreground">
+										<div className="text-center">
+											<AlertCircle className="h-8 w-8 mx-auto mb-2" />
+											<p className="text-sm">Failed to load plot</p>
+											<p className="text-xs text-muted-foreground mt-1">
+												{value}
+											</p>
+										</div>
+									</div>
+								) : (
+									<Image
+										src={value}
+										alt={key}
+										fill
+										className="object-contain"
+										onError={() => handleImageError(key)}
+										sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+									/>
+								)}
+							</div>
 						</div>
-					</div>
-				))}
+					);
+				})}
 			</div>
 
 			<Dialog open={!!selectedPlot} onOpenChange={() => setSelectedPlot(null)}>
-				<DialogContent className="max-w-[90vw] w-auto max-h-[90vh]">
-					<DialogTitle></DialogTitle>
-					<div className="relative">
+				<DialogContent className="max-w-[95vw] max-h-[95vh] w-auto h-auto">
+					<DialogTitle className="sr-only">Plot Viewer</DialogTitle>
+					<div className="relative w-full h-[80vh] min-h-[400px]">
 						{selectedPlot && (
 							<Image
-								src={selectedPlot} // Now using URL directly
+								src={selectedPlot}
 								alt="Full size plot"
-								layout="responsive"
-								width={800}
-								height={600}
+								fill
 								className="object-contain"
+								sizes="95vw"
 							/>
 						)}
 					</div>

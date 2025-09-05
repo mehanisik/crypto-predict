@@ -1,6 +1,6 @@
-import MarketOverviewWidget from "@/components/widgets/market-overview";
+import { MarketOverviewWidget } from "@/components/widgets/market-overview";
 import MachineLearningWidget from "@/components/widgets/ml-model";
-import LiveChartWidget from "@/components/widgets/technical-analysis";
+import { LiveChartWidget } from "@/components/widgets/technical-analysis";
 export default function Page() {
 	return (
 		<div className="flex min-h-svh w-full flex-1 flex-col bg-background">

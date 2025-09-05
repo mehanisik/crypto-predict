@@ -1,5 +1,3 @@
-"use client";
-
 import {
 	Table,
 	TableBody,
@@ -13,10 +11,12 @@ import SparkLineChart from "../charts/sparkline-chart";
 import Image from "next/image";
 import { Widget } from "../ui/widget";
 import { formatNumber, formatPercentage } from "@/lib/utils";
-import { useMarketStats } from "@/hooks/use-market-queries";
+import { getMarketStats } from "@/lib/actions";
 
-export default function MarketOverviewWidget() {
-	const { data } = useMarketStats();
+export const revalidate = 60;
+
+export async function MarketOverviewWidget() {
+	const data = await getMarketStats();
 
 	return (
 		<Widget title="Market Overview">
