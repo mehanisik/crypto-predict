@@ -31,20 +31,19 @@ jwt = JWTManager()
 
 limiter = None
 
-# Get logger
 logger = get_logger(__name__)
 
 
 def create_app(config_name=None):
     """Application factory function."""
-    
+
     config = get_config(config_name)
-    
+
     app = Flask(__name__)
     app.config.from_object(config)
-    
+
     setup_logging()
-    
+
     db.init_app(app)
     migrate.init_app(app, db)
     socketio.init_app(
@@ -58,7 +57,7 @@ def create_app(config_name=None):
         logger=True,
         engineio_logger=True
     )
-    
+
     swagger_config = {
         "headers": [],
         "specs": [
@@ -73,7 +72,7 @@ def create_app(config_name=None):
         "swagger_ui": True,
         "specs_route": "/apidocs/"
     }
-    
+
     swagger_template = {
         "swagger": "2.0",
         "info": {
@@ -91,13 +90,13 @@ def create_app(config_name=None):
         "consumes": ["application/json"],
         "produces": ["application/json"]
     }
-    
+
     swagger = Swagger(app, config=swagger_config, template=swagger_template)
-    
+
     app.socketio = socketio
-    
+
     register_websocket_handlers(socketio)
-    
+
     # Register static file serving for plots
     @app.route('/static/plots/<filename>')
     def serve_plot(filename):
@@ -109,7 +108,7 @@ def create_app(config_name=None):
         except Exception as e:
             logger.error(f"Error serving plot {filename}: {e}")
             return {'error': 'Internal server error'}, 500
-    
+
     # Start background cleanup task for plot files
     def cleanup_plots_background():
         """Background task to clean up old plot files"""
@@ -121,10 +120,10 @@ def create_app(config_name=None):
             except Exception as e:
                 logger.error(f"Plot cleanup error: {e}")
                 time.sleep(3600)
-    
+
     cleanup_thread = threading.Thread(target=cleanup_plots_background, daemon=True)
     cleanup_thread.start()
-    
+
     try:
         cache.init_app(app)
         logger.info("cache_configured_with_redis")
@@ -133,9 +132,9 @@ def create_app(config_name=None):
         app.config['CACHE_TYPE'] = 'simple'
         cache.init_app(app)
         logger.warning(f"cache_fallback_to_simple: {e}")
-    
+
     jwt.init_app(app)
-    
+
     global limiter
     try:
         limiter = Limiter(
@@ -173,16 +172,16 @@ def create_app(config_name=None):
             return request.path.startswith('/metrics')
         except Exception:
             return False
-    
+
     # Setup CORS
     CORS(app, origins=config.CORS_ORIGINS)
-    
+
     # Setup middleware
     setup_middleware(app)
-    
+
     # Register error handlers
     register_error_handlers(app)
-    
+
     # Register blueprints
     from app.blueprints import api_bp
     app.register_blueprint(api_bp, url_prefix=f'/api/{config.API_VERSION}')
@@ -193,11 +192,11 @@ def create_app(config_name=None):
         logger.info("prometheus_metrics_enabled")
     except Exception as e:
         logger.warning(f"prometheus_metrics_setup_failed: {e}")
-    
+
     # Register CLI commands
     from app.cli import register_commands
     register_commands(app)
-    
+
     return app
 
 
@@ -207,40 +206,40 @@ def register_websocket_handlers(socketio_instance):
         handle_connect, handle_disconnect, handle_join_training,
         handle_leave_training, handle_join_prediction, handle_leave_prediction
     )
-    
+
     @socketio_instance.on('connect')
     def on_connect():
         handle_connect()
-    
+
     @socketio_instance.on('disconnect')
     def on_disconnect(reason=None):
         handle_disconnect()
-    
+
     @socketio_instance.on('join_training')
     def on_join_training(data):
         handle_join_training(data)
-    
+
     @socketio_instance.on('leave_training')
     def on_leave_training(data):
         handle_leave_training(data)
-    
+
     @socketio_instance.on('join_prediction')
     def on_join_prediction(data):
         handle_join_prediction(data)
-    
+
     @socketio_instance.on('leave_prediction')
     def on_leave_prediction(data):
         handle_leave_prediction(data)
-    
+
     logger.info("websocket_handlers_registered")
 
 
 def create_celery_app(app):
     """Create Celery application for background tasks."""
     from celery import Celery
-    
+
     celery = Celery(app.import_name)
-    
+
     # Use modern Celery keys and filter out deprecated settings
     celery_config = {}
     for k, v in app.config.items():
@@ -252,18 +251,18 @@ def create_celery_app(app):
             'RESULT_BACKEND',
         ]:
             celery_config[k] = v
-    
+
     celery.conf.update(
         # Prefer modern keys if present, fall back to legacy for backwards-compat
         broker_url=app.config.get('CELERY_BROKER_URL') or app.config.get('BROKER_URL'),
         result_backend=app.config.get('CELERY_RESULT_BACKEND') or app.config.get('RESULT_BACKEND'),
         **celery_config
     )
-    
+
     class ContextTask(celery.Task):
         def __call__(self, *args, **kwargs):
             with app.app_context():
                 return self.run(*args, **kwargs)
-    
+
     celery.Task = ContextTask
     return celery

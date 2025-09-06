@@ -2,11 +2,10 @@ import structlog
 import logging
 import sys
 from datetime import datetime
-from typing import Any, Dict
 
 def setup_logging() -> None:
     """Configure structured logging for the application."""
-    
+
     structlog.configure(
         processors=[
             structlog.stdlib.filter_by_level,
@@ -37,7 +36,7 @@ def get_logger(name: str) -> structlog.BoundLogger:
 
 class LoggerMixin:
     """Mixin to add logging capabilities to classes."""
-    
+
     @property
     def logger(self) -> structlog.BoundLogger:
         """Get logger instance for the class."""
@@ -47,59 +46,59 @@ def log_function_call(func):
     """Decorator to log function calls with parameters and timing."""
     def wrapper(*args, **kwargs):
         logger = structlog.get_logger(func.__module__)
-        
+
         start_time = datetime.now()
-        logger.info("function_call_start", 
+        logger.info("function_call_start",
                    function=func.__name__,
                    args=args,
                    kwargs=kwargs)
-        
+
         try:
             result = func(*args, **kwargs)
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
-            
+
             logger.info("function_call_success",
                        function=func.__name__,
                        duration=duration,
                        result_type=type(result).__name__)
             return result
-            
+
         except Exception as e:
             end_time = datetime.now()
             duration = (end_time - start_time).total_seconds()
-            
+
             logger.error("function_call_failed",
                         function=func.__name__,
                         duration=duration,
                         error=str(e),
                         exc_info=True)
             raise
-    
+
     return wrapper
 
 def log_api_request(func):
     """Decorator to log API requests with structured data."""
     def wrapper(*args, **kwargs):
         logger = structlog.get_logger(func.__module__)
-        
+
         request_id = kwargs.get('request_id', 'unknown')
         endpoint = func.__name__
-        
+
         logger.info("api_request_start",
                    request_id=request_id,
                    endpoint=endpoint,
                    method=kwargs.get('method', 'unknown'))
-        
+
         try:
             result = func(*args, **kwargs)
-            
+
             logger.info("api_request_success",
                        request_id=request_id,
                        endpoint=endpoint,
                        status_code=kwargs.get('status_code', 200))
             return result
-            
+
         except Exception as e:
             logger.error("api_request_failed",
                         request_id=request_id,
@@ -107,7 +106,7 @@ def log_api_request(func):
                         error=str(e),
                         exc_info=True)
             raise
-    
+
     return wrapper
 
 def log_training_event(event_type: str, session_id: str, **kwargs):

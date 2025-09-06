@@ -60,7 +60,7 @@ signal.signal(signal.SIGINT, signal_handler)
 if __name__ == '__main__':
     print("🚀 Starting server...")
     logger.info("starting_crypto_prediction_api")
-    
+
     try:
         print(f"🌐 Starting on port {os.getenv('PORT', 5000)}...")
         socketio.run(

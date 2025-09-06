@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 
 def register_error_handlers(app):
     """Register all error handlers for the application."""
-    
+
     @app.errorhandler(CryptoPredictionError)
     def handle_crypto_prediction_error(error):
         """Handle custom crypto prediction errors."""
@@ -22,7 +22,7 @@ def register_error_handlers(app):
                     details=error.details,
                     path=request.path,
                     method=request.method)
-        
+
         response = {
             'error': error.message,
             'error_code': error.error_code,
@@ -30,9 +30,9 @@ def register_error_handlers(app):
             'path': request.path,
             'method': request.method
         }
-        
+
         return jsonify(response), 400
-    
+
     @app.errorhandler(ValidationError)
     def handle_validation_error(error):
         """Handle validation errors."""
@@ -40,7 +40,7 @@ def register_error_handlers(app):
                       field_errors=error.messages,
                       path=request.path,
                       method=request.method)
-        
+
         response = {
             'error': 'Validation failed',
             'error_code': 'VALIDATION_ERROR',
@@ -50,9 +50,9 @@ def register_error_handlers(app):
             'path': request.path,
             'method': request.method
         }
-        
+
         return jsonify(response), 400
-    
+
     @app.errorhandler(SQLAlchemyError)
     def handle_database_error(error):
         """Handle database errors."""
@@ -61,7 +61,7 @@ def register_error_handlers(app):
                     path=request.path,
                     method=request.method,
                     exc_info=True)
-        
+
         response = {
             'error': 'Database operation failed',
             'error_code': 'DATABASE_ERROR',
@@ -71,9 +71,9 @@ def register_error_handlers(app):
             'path': request.path,
             'method': request.method
         }
-        
+
         return jsonify(response), 500
-    
+
     @app.errorhandler(HTTPException)
     def handle_http_error(error):
         """Handle HTTP errors."""
@@ -82,7 +82,7 @@ def register_error_handlers(app):
                       description=error.description,
                       path=request.path,
                       method=request.method)
-        
+
         response = {
             'error': error.description,
             'error_code': f'HTTP_{error.code}',
@@ -90,9 +90,9 @@ def register_error_handlers(app):
             'path': request.path,
             'method': request.method
         }
-        
+
         return jsonify(response), error.code
-    
+
     @app.errorhandler(Exception)
     def handle_generic_error(error):
         """Handle all other errors."""
@@ -101,7 +101,7 @@ def register_error_handlers(app):
                     path=request.path,
                     method=request.method,
                     exc_info=True)
-        
+
         # In production, don't expose internal errors
         if current_app.config.get('DEBUG', False):
             response = {
@@ -124,16 +124,16 @@ def register_error_handlers(app):
                 'path': request.path,
                 'method': request.method
             }
-        
+
         return jsonify(response), 500
-    
+
     @app.errorhandler(404)
     def handle_not_found(error):
         """Handle 404 errors."""
         logger.warning("not_found",
                       path=request.path,
                       method=request.method)
-        
+
         response = {
             'error': 'Resource not found',
             'error_code': 'NOT_FOUND',
@@ -143,16 +143,16 @@ def register_error_handlers(app):
             'path': request.path,
             'method': request.method
         }
-        
+
         return jsonify(response), 404
-    
+
     @app.errorhandler(405)
     def handle_method_not_allowed(error):
         """Handle 405 errors."""
         logger.warning("method_not_allowed",
                       path=request.path,
                       method=request.method)
-        
+
         response = {
             'error': 'Method not allowed',
             'error_code': 'METHOD_NOT_ALLOWED',
@@ -162,16 +162,16 @@ def register_error_handlers(app):
             'path': request.path,
             'method': request.method
         }
-        
+
         return jsonify(response), 405
-    
+
     @app.errorhandler(429)
     def handle_rate_limit_exceeded(error):
         """Handle rate limit exceeded errors."""
         logger.warning("rate_limit_exceeded",
                       path=request.path,
                       method=request.method)
-        
+
         response = {
             'error': 'Rate limit exceeded',
             'error_code': 'RATE_LIMIT_EXCEEDED',
@@ -181,9 +181,9 @@ def register_error_handlers(app):
             'path': request.path,
             'method': request.method
         }
-        
+
         return jsonify(response), 429
-    
+
     logger.info("error_handlers_registered")
 
 
@@ -193,7 +193,7 @@ def handle_request_validation_error(error, schema, data):
                   schema=schema.__class__.__name__,
                   field_errors=error.messages,
                   data=data)
-    
+
     # Format field errors for better UX
     formatted_errors = {}
     for field, messages in error.messages.items():
@@ -201,7 +201,7 @@ def handle_request_validation_error(error, schema, data):
             formatted_errors[field] = messages[0]  # Take first error message
         else:
             formatted_errors[field] = str(messages)
-    
+
     response = {
         'error': 'Request validation failed',
         'error_code': 'VALIDATION_ERROR',
@@ -210,5 +210,5 @@ def handle_request_validation_error(error, schema, data):
             'schema': schema.__class__.__name__
         }
     }
-    
+
     return response, 400

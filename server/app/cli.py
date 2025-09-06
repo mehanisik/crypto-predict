@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 
 def register_commands(app):
     """Register CLI commands with the application."""
-    
+
     @app.cli.command('init-db')
     @with_appcontext
     def init_db():
@@ -22,7 +22,7 @@ def register_commands(app):
             click.echo('Database initialized successfully!')
         except Exception as e:
             click.echo(f'Error initializing database: {e}')
-    
+
     @app.cli.command('seed-db')
     @with_appcontext
     def seed_db():
@@ -38,7 +38,7 @@ def register_commands(app):
                 batch_size=32,
                 learning_rate=0.001
             )
-            
+
             config2 = ModelConfiguration(
                 config_hash='sample_cnn_lstm_eth',
                 model_type='CNN-LSTM',
@@ -48,16 +48,16 @@ def register_commands(app):
                 batch_size=32,
                 learning_rate=0.001
             )
-            
+
             db.session.add(config1)
             db.session.add(config2)
             db.session.commit()
-            
+
             click.echo('Database seeded successfully!')
         except Exception as e:
             click.echo(f'Error seeding database: {e}')
             db.session.rollback()
-    
+
     @app.cli.command('cleanup-sessions')
     @with_appcontext
     def cleanup_sessions():
@@ -66,35 +66,35 @@ def register_commands(app):
             # Delete sessions older than 30 days
             from datetime import datetime, timedelta
             cutoff_date = datetime.utcnow() - timedelta(days=30)
-            
+
             old_sessions = TrainingSession.query.filter(
                 TrainingSession.created_at < cutoff_date
             ).all()
-            
+
             count = len(old_sessions)
             for session in old_sessions:
                 db.session.delete(session)
-            
+
             db.session.commit()
             click.echo(f'Cleaned up {count} old training sessions!')
         except Exception as e:
             click.echo(f'Error cleaning up sessions: {e}')
             db.session.rollback()
-    
+
     @app.cli.command('list-sessions')
     @with_appcontext
     def list_sessions():
         """List all training sessions."""
         try:
             sessions = TrainingSession.query.order_by(TrainingSession.created_at.desc()).all()
-            
+
             if not sessions:
                 click.echo('No training sessions found.')
                 return
-            
+
             click.echo(f'Found {len(sessions)} training sessions:')
             click.echo('-' * 80)
-            
+
             for session in sessions:
                 status_color = 'green' if session.status == TrainingStatus.COMPLETED else 'yellow'
                 click.echo(
@@ -107,7 +107,7 @@ def register_commands(app):
                 )
         except Exception as e:
             click.echo(f'Error listing sessions: {e}')
-    
+
     @app.cli.command('health-check')
     @with_appcontext
     def health_check():
@@ -117,28 +117,28 @@ def register_commands(app):
             from sqlalchemy import text
             db.session.execute(text('SELECT 1'))
             click.echo(click.style('✅ Database: Healthy', fg='green'))
-            
+
             # Check training sessions
             total_sessions = TrainingSession.query.count()
             active_sessions = TrainingSession.query.filter_by(
                 status=TrainingStatus.IN_PROGRESS
             ).count()
-            
+
             click.echo(click.style(f'✅ Training Sessions: {total_sessions} total, {active_sessions} active', fg='green'))
-            
+
             # Check model configurations
             total_configs = ModelConfiguration.query.count()
             click.echo(click.style(f'✅ Model Configurations: {total_configs} total', fg='green'))
-            
+
             # Check predictions
             total_predictions = Prediction.query.count()
             click.echo(click.style(f'✅ Predictions: {total_predictions} total', fg='green'))
-            
+
             click.echo(click.style('\n🎉 All systems are healthy!', fg='green'))
-            
+
         except Exception as e:
             click.echo(click.style(f'❌ Health check failed: {e}', fg='red'))
-    
+
     @app.cli.command('reset-db')
     @with_appcontext
     def reset_db():
@@ -150,5 +150,5 @@ def register_commands(app):
                 click.echo('Database reset successfully!')
             except Exception as e:
                 click.echo(f'Error resetting database: {e}')
-    
+
     logger.info("cli_commands_registered")

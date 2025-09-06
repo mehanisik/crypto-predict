@@ -23,8 +23,7 @@ class ModelStage(Enum):
 
 class ProgressTracker:
     """Centralized progress tracking with smooth transitions"""
-    
-    # Define stage progress weights with more granular steps
+
     STAGE_PROGRESS = {
         ModelStage.DATA_FETCHING: 5,
         ModelStage.DATA_FETCHED: 10,
@@ -38,18 +37,18 @@ class ProgressTracker:
         ModelStage.VISUALIZING_UPDATE: 85,
         ModelStage.TRAINING_COMPLETED: 100
     }
-    
+
     def __init__(self):
         self.current_stage = ModelStage.DATA_FETCHING
         self.current_progress = 0
         self.training_epoch_progress = 0  # 0-100 for training epochs
         self.stage_sub_progress = 0  # 0-100 for sub-stages within a stage
         self.last_update_time = time.time()
-    
+
     def get_progress(self, stage: ModelStage, epoch_progress: float = 0, sub_progress: float = 0) -> int:
         """Calculate total progress based on stage, epoch progress, and sub-progress"""
         base_progress = self.STAGE_PROGRESS.get(stage, 0)
-        
+
         if stage == ModelStage.TRAINING_PROGRESS:
             # Training stage: base 40% + epoch progress (up to 30%)
             epoch_contribution = (epoch_progress / 100) * 30
@@ -67,7 +66,7 @@ class ProgressTracker:
             stage_range = self._get_stage_range(stage)
             sub_contribution = (sub_progress / 100) * stage_range
             return min(int(base_progress + sub_contribution), self.STAGE_PROGRESS.get(stage, 0))
-    
+
     def _get_stage_range(self, stage: ModelStage) -> int:
         """Get the progress range for a stage"""
         stages = list(self.STAGE_PROGRESS.keys())
@@ -79,18 +78,18 @@ class ProgressTracker:
                 return 5  # Default range for last stage
         except ValueError:
             return 5
-    
+
     def update_stage(self, stage: ModelStage, sub_progress: float = 0):
         """Update current stage with sub-progress"""
         self.current_stage = stage
         self.stage_sub_progress = sub_progress
         self.current_progress = self.get_progress(stage, self.training_epoch_progress, sub_progress)
-    
+
     def update_training_progress(self, epoch: int, total_epochs: int):
         """Update training epoch progress"""
         self.training_epoch_progress = (epoch / total_epochs) * 100
         self.current_progress = self.get_progress(ModelStage.TRAINING_PROGRESS, self.training_epoch_progress, self.stage_sub_progress)
-    
+
     def update_sub_progress(self, sub_progress: float):
         """Update sub-progress within current stage"""
         self.stage_sub_progress = sub_progress
@@ -102,15 +101,12 @@ class WebSocketManager:
         self.socketio = socketio
         self.logger = structlog.get_logger(__name__)
         self.progress_trackers = {}  # session_id -> ProgressTracker
-        # Handlers are registered centrally in app.__init__/websocket_routes
-        # Avoid double registration here.
 
     def _build_message_for_stage(self, stage: str, data: Dict[str, Any]) -> str:
         """Return a concise human-readable message for a given stage.
 
         This normalizes messages across emitters so the client gets consistent phrasing.
         """
-        # If a message is explicitly provided, prefer that
         if isinstance(data.get('message'), str) and data['message'].strip():
             return data['message']
 
@@ -156,7 +152,6 @@ class WebSocketManager:
         if stage_enum == ModelStage.TRAINING_COMPLETED:
             return "Training completed successfully!"
 
-        # Default fallback
         return stage.replace('_', ' ')
 
     def _build_payload(self,
@@ -336,7 +331,7 @@ class WebSocketManager:
     def emit_stage(self, session_id: str, stage: str, data: Dict[str, Any]):
         """Emit stage update with proper progress calculation"""
         tracker = self.get_progress_tracker(session_id)
-        
+
         # Convert string stage to enum if possible
         try:
             stage_enum = ModelStage(stage)
@@ -346,7 +341,7 @@ class WebSocketManager:
         except ValueError:
             # Handle non-enum stages
             pass
-        
+
         # Calculate progress
         if stage == 'training_progress' and 'epoch' in data and 'total_epochs' in data:
             tracker.update_training_progress(data['epoch'], data['total_epochs'])
@@ -357,13 +352,13 @@ class WebSocketManager:
         # Ensure message is present and descriptive
         if 'message' not in data:
             data['message'] = self._build_message_for_stage(stage, data)
-        
+
         # Add smooth transition delay between stages
         try:
             time.sleep(0.5)  # Reduced delay for smoother transitions
         except Exception:
             pass
-        
+
         # Convenience to emit namespaced stage updates to a training room
         self.broadcast_stage_update(stage, {**data, 'session_id': session_id}, room=f'training_{session_id}', progress=progress)
 
@@ -371,7 +366,7 @@ class WebSocketManager:
         """Emit training progress with proper progress calculation"""
         tracker = self.get_progress_tracker(session_id)
         tracker.update_training_progress(epoch, total_epochs)
-        
+
         data = {
             'type': 'training_progress',
             'message': f'Epoch {epoch}/{total_epochs} completed',
@@ -379,12 +374,12 @@ class WebSocketManager:
             'total_epochs': total_epochs,
             'epoch_progress': tracker.training_epoch_progress
         }
-        
+
         if accuracy is not None:
             data['accuracy'] = round(accuracy, 4)
         if loss is not None:
             data['loss'] = round(loss, 4)
-        
+
         # Keep backward-compatible flat event
         self.emit_training_update(session_id, data)
         # Also emit unified metric sample for new client consumers
@@ -395,7 +390,7 @@ class WebSocketManager:
         tracker = self.get_progress_tracker(session_id)
         sub_progress = (metric_progress / total_metrics) * 100
         tracker.update_sub_progress(sub_progress)
-        
+
         data = {
             'type': 'evaluating_update',
             'current_metric': current_metric,
@@ -404,7 +399,7 @@ class WebSocketManager:
             'sub_progress': sub_progress,
             'message': f'Calculating {current_metric.upper()} metric'
         }
-        
+
         self.emit_training_update(session_id, data)
 
     def emit_visualization_progress(self, session_id: str, current_plot: str, total_plots: int, plot_progress: float):
@@ -412,7 +407,7 @@ class WebSocketManager:
         tracker = self.get_progress_tracker(session_id)
         sub_progress = (plot_progress / total_plots) * 100
         tracker.update_sub_progress(sub_progress)
-        
+
         data = {
             'type': 'visualizing_update',
             'current_plot': current_plot,
@@ -421,25 +416,25 @@ class WebSocketManager:
             'sub_progress': sub_progress,
             'message': f'Generating {current_plot} visualization'
         }
-        
+
         self.emit_training_update(session_id, data)
 
     def emit_completion(self, session_id: str, final_data: Dict[str, Any]):
         """Emit training completion with 100% progress"""
         tracker = self.get_progress_tracker(session_id)
         tracker.update_stage(ModelStage.TRAINING_COMPLETED)
-        
+
         completion_data = {
             'type': 'training_completed',
             'message': 'Training completed successfully!',
             **final_data
         }
-        
+
         # Legacy event
         self.emit_training_update(session_id, {**completion_data, 'progress': 100})
         # Unified
         self.emit_unified(session_id, phase='complete', event='training_completed', data=completion_data, progress=100)
-        
+
         # Clean up tracker
         if session_id in self.progress_trackers:
             del self.progress_trackers[session_id]

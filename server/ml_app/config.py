@@ -10,4 +10,4 @@ class ModelConfig:
     random_seed: int = 42
     ticker: str = "BTC-USD"
     learning_rate: float = 0.001  # Added learning rate
-    early_stopping_patience: int = 20  # Added early stopping patience 
+    early_stopping_patience: int = 20  # Added early stopping patience

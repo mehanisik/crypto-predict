@@ -3,7 +3,7 @@ from .training import TrainingRequestSchema, TrainingResponseSchema
 
 __all__ = [
     'PredictionRequestSchema',
-    'PredictionResponseSchema', 
+    'PredictionResponseSchema',
     'TrainingRequestSchema',
     'TrainingResponseSchema'
 ]

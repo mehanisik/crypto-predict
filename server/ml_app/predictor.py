@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional
 import numpy as np
 from pathlib import Path
 from joblib import dump, load  # type: ignore
@@ -13,7 +13,6 @@ from .models import CNNModel, LSTMModel, CNNLSTMModel, LSTMCNNModel
 from .websocket.manager import WebSocketManager
 from .data.metrics_calculator import MetricsCalculator
 
-# Use container app root (/app) as base so models map to /app/models
 BASE_DIR = Path(__file__).resolve().parents[1]
 LATEST_MODEL_PATH = (BASE_DIR / "models" / "latest_model.joblib").resolve()
 
@@ -22,7 +21,6 @@ class CryptoPredictor:
         self.config = config
         self.model = None
         self.data_processor = DataProcessor(config)
-        # Visualizer is heavy (matplotlib/seaborn); import lazily in training path
         self.visualizer = None
         self.websocket_manager = websocket_manager
         self.logger = structlog.get_logger(__name__)
@@ -30,18 +28,18 @@ class CryptoPredictor:
     def _get_model_builder(self):
         """Get the appropriate model builder based on configuration."""
         from .models import CNNModel, LSTMModel, CNNLSTMModel, LSTMCNNModel
-        
+
         model_map = {
             'CNN': CNNModel,
             'LSTM': LSTMModel,
             'CNN-LSTM': CNNLSTMModel,
             'LSTM-CNN': LSTMCNNModel
         }
-        
+
         model_class = model_map.get(self.config.model)
         if not model_class:
             raise ValueError(f"Unsupported model type: {self.config.model}")
-        
+
         return model_class()
 
     def train(self, ticker_symbol: str, start_date: str, end_date: str, *, session_id: str) -> Dict:
@@ -58,9 +56,9 @@ class CryptoPredictor:
         """
         try:
             training_start_time = datetime.now()
-            self.logger.info("training_started", 
-                           ticker=ticker_symbol, 
-                           start_date=start_date, 
+            self.logger.info("training_started",
+                           ticker=ticker_symbol,
+                           start_date=start_date,
                            end_date=end_date)
 
             # Data fetching stage
@@ -79,9 +77,9 @@ class CryptoPredictor:
             # Emit fetched data summary
             try:
                 self.websocket_manager.emit_stage(session_id, 'data_fetched', {
-                    'rows': int(len(original_prices)),
-                    'train_samples': int(len(X_train)),
-                    'test_samples': int(len(X_test)),
+                    'rows': len(original_prices),
+                    'train_samples': len(X_train),
+                    'test_samples': len(X_test),
                     'lookback': int(self.config.lookback),
                     'message': f'Retrieved {len(original_prices)} data points ({len(X_train)} train, {len(X_test)} test)'
                 })
@@ -156,14 +154,14 @@ class CryptoPredictor:
 
                 def on_epoch_end(self, epoch, logs=None):
                     current_time = datetime.now()
-                    
+
                     # Check if enough time has passed since last update
                     if (current_time - self.last_update).total_seconds() >= self.update_interval:
                         accuracy = logs.get('accuracy', 0) if logs else 0
                         loss = logs.get('loss', 0) if logs else 0
                         val_accuracy = logs.get('val_accuracy', 0) if logs else 0
                         val_loss = logs.get('val_loss', 0) if logs else 0
-                        
+
                         # Use the new progress tracking system
                         self.predictor.websocket_manager.emit_training_progress(
                             self.session_id,
@@ -185,7 +183,7 @@ class CryptoPredictor:
                             )
                         except Exception:
                             pass
-                        
+
                         self.last_update = current_time
 
             # Train the model
@@ -207,12 +205,12 @@ class CryptoPredictor:
             # Evaluation stage with detailed progress
             self.logger.info("starting_evaluation")
             metrics_to_calculate = ['mae', 'rmse', 'r2', 'mape']
-            
+
             for i, metric in enumerate(metrics_to_calculate):
                 self.websocket_manager.emit_evaluation_progress(
-                    session_id, 
-                    metric, 
-                    len(metrics_to_calculate), 
+                    session_id,
+                    metric,
+                    len(metrics_to_calculate),
                     i + 1
                 )
 
@@ -289,8 +287,8 @@ class CryptoPredictor:
 
             # Log completion
             training_duration = (datetime.now() - training_start_time).total_seconds()
-            self.logger.info("training_completed", 
-                           ticker=ticker_symbol, 
+            self.logger.info("training_completed",
+                           ticker=ticker_symbol,
                            duration=training_duration,
                            train_metrics=train_metrics,
                            test_metrics=test_metrics)
@@ -308,7 +306,7 @@ class CryptoPredictor:
                 'mape': round(test_metrics.get('mape', 0), 4),
                 'training_duration': round(training_duration, 2)
             }
-            
+
             self.websocket_manager.emit_completion(session_id, final_data)
 
             return {
@@ -337,7 +335,7 @@ class CryptoPredictor:
         # Persist number of features used during training to reconstruct input shape
         try:
             if hasattr(self.data_processor, 'df') and self.data_processor.df is not None:
-                state['num_features'] = int(len(self.data_processor.df.columns))
+                state['num_features'] = len(self.data_processor.df.columns)
             else:
                 state['num_features'] = 1
         except Exception:
@@ -351,11 +349,11 @@ class CryptoPredictor:
         try:
             if not LATEST_MODEL_PATH.exists():
                 return None
-            
+
             state = load(LATEST_MODEL_PATH)
             config = ModelConfig(**state['data_processor']['config'])
             predictor = cls(config, websocket_manager)
-            
+
             # Rebuild model and set weights
             if config.model == "CNN":
                 model_builder = CNNModel()
@@ -367,7 +365,7 @@ class CryptoPredictor:
                 model_builder = LSTMCNNModel()
             else:
                 raise ValueError(f"Invalid model: {config.model}")
-            
+
             # Rebuild model with training-time feature count
             num_features = state.get('num_features')
             if not num_features:
@@ -383,12 +381,12 @@ class CryptoPredictor:
             except Exception as weight_err:
                 # If weights mismatch (e.g., architecture drift), log and continue with fresh model
                 structlog.get_logger(__name__).error("failed_to_set_weights", error=str(weight_err))
-            
+
             # Restore data processor state
             predictor.data_processor.mean = state['data_processor']['mean']
             predictor.data_processor.std = state['data_processor']['std']
             predictor.data_processor.df = pd.DataFrame.from_dict(state['data_processor']['df'])
-            
+
             return predictor
         except Exception as e:
             # Use module logger since classmethod has no instance logger
@@ -407,7 +405,7 @@ class CryptoPredictor:
         """
         if self.model is None:
             raise ValueError("Model not trained. Call train() first.")
-        
+
         try:
             predictions = self.model.predict(data, verbose=0)
             return predictions.squeeze()
@@ -424,7 +422,7 @@ class CryptoPredictor:
         """
         if self.model is None:
             raise ValueError("No model to save. Train the model first.")
-        
+
         try:
             self.model.save(path)
             self.logger.info("model_saved", path=path)
@@ -460,7 +458,7 @@ class CryptoPredictor:
         try:
             predictions = []
             current_window = initial_data.copy()
-            
+
             # Calculate volatility proxy on target feature (last column if multi-feature)
             if isinstance(self.data_processor.std, (list, tuple, np.ndarray)):
                 target_std = float(np.array(self.data_processor.std)[-1])
@@ -471,10 +469,10 @@ class CryptoPredictor:
             except Exception:
                 target_series = current_window
             historical_volatility = target_std * float(np.std(target_series))
-            
+
             # Increase uncertainty for further predictions
             base_uncertainty = historical_volatility * 2  # Double the historical volatility for base uncertainty
-            
+
             for day in range(days):
                 # Prepare prediction window
                 input_data = current_window[-self.config.lookback:]
@@ -484,7 +482,7 @@ class CryptoPredictor:
                 if len(input_data.shape) == 2 and input_data.shape[-1] > expected_features:
                     input_data = input_data[:, -expected_features:]
                 input_data = input_data.reshape(1, self.config.lookback, expected_features)
-                
+
                 # Make prediction
                 prediction = self.model.predict(input_data, verbose=0)
                 if isinstance(self.data_processor.mean, (list, tuple, np.ndarray)):
@@ -494,13 +492,13 @@ class CryptoPredictor:
                     mean_target = float(self.data_processor.mean)
                     std_target = float(self.data_processor.std)
                 predicted_value = float(prediction[0, 0] * (std_target if std_target != 0 else 1.0) + mean_target)
-                
+
                 # Increase confidence interval with time
                 time_factor = 1 + (day * 0.1)  # 10% increase in uncertainty per day
                 confidence_interval = base_uncertainty * time_factor
-                
+
                 prediction_date = datetime.now() + timedelta(days=day+1)
-                
+
                 prediction_data = {
                     'day': day + 1,
                     'predicted_price': predicted_value,
@@ -508,11 +506,11 @@ class CryptoPredictor:
                     'lower_bound': float(predicted_value - confidence_interval),
                     'upper_bound': float(predicted_value + confidence_interval),
                     'timestamp': prediction_date.isoformat(),
-                    'volatility_factor': float(time_factor)  
+                    'volatility_factor': float(time_factor)
                 }
-                
+
                 predictions.append(prediction_data)
-                
+
                 # Update window with prediction for next iteration
                 norm_pred = (predicted_value - mean_target) / (std_target if std_target != 0 else 1.0)
                 if hasattr(current_window, 'shape') and len(current_window.shape) > 1:
@@ -521,11 +519,11 @@ class CryptoPredictor:
                     current_window = np.vstack([current_window[1:], next_row])
                 else:
                     current_window = np.append(current_window[1:], norm_pred)
-                
+
             return predictions
-            
+
         except Exception as e:
-            self.logger.error("multi_day_prediction_failed", 
+            self.logger.error("multi_day_prediction_failed",
                             error=str(e),
                             exc_info=True)
             raise
@@ -535,12 +533,12 @@ class CryptoPredictor:
         try:
             # Lazy import visualizer to avoid heavy imports
             from .visualization.visualizer import Visualizer
-            
+
             # Denormalize predictions
             if hasattr(self.data_processor, 'mean') and hasattr(self.data_processor, 'std'):
                 mean = self.data_processor.mean
                 std = self.data_processor.std
-                
+
                 # Handle multi-feature case
                 if isinstance(mean, (list, tuple, np.ndarray)):
                     mean_target = float(np.array(mean)[-1])
@@ -548,7 +546,7 @@ class CryptoPredictor:
                 else:
                     mean_target = float(mean)
                     std_target = float(std)
-                
+
                 y_pred_train_denorm = y_pred_train.flatten() * std_target + mean_target
                 y_pred_test_denorm = y_pred_test.flatten() * std_target + mean_target
                 y_train_denorm = y_train.flatten() * std_target + mean_target
@@ -558,21 +556,21 @@ class CryptoPredictor:
                 y_pred_test_denorm = y_pred_test.flatten()
                 y_train_denorm = y_train.flatten()
                 y_test_denorm = y_test.flatten()
-            
+
             train_size = len(y_train)
             lookback = self.config.lookback
-            
+
             # Generate specific plot based on name
             if plot_name == 'training_history':
                 return Visualizer.plot_training_history(history, ax=None)
             elif plot_name == 'predictions_vs_actual':
                 return Visualizer.plot_predictions_vs_actual(
-                    y_train_denorm, y_pred_train_denorm, 
+                    y_train_denorm, y_pred_train_denorm,
                     y_test_denorm, y_pred_test_denorm, ax=None
                 )
             elif plot_name == 'residuals':
                 return Visualizer.plot_residuals(
-                    y_train_denorm, y_pred_train_denorm, 
+                    y_train_denorm, y_pred_train_denorm,
                     y_test_denorm, y_pred_test_denorm, ax=None
                 )
             elif plot_name == 'price_predictions':
@@ -620,7 +618,7 @@ class CryptoPredictor:
             else:
                 self.logger.warning(f"Unknown plot type: {plot_name}")
                 return None
-                
+
         except Exception as e:
             self.logger.error(f"Failed to generate {plot_name} plot", error=str(e))
             return None
@@ -629,20 +627,20 @@ class CryptoPredictor:
         """Generate all visualizations (legacy method for backward compatibility)"""
         plots = {}
         plot_names = [
-            'training_history', 'predictions_vs_actual', 'residuals', 
+            'training_history', 'predictions_vs_actual', 'residuals',
             'price_predictions', 'feature_importance', 'model_performance',
             'data_distribution', 'correlation_matrix', 'rolling_metrics',
             'volatility_analysis', 'trend_analysis', 'seasonality', 'forecast'
         ]
-        
+
         for plot_name in plot_names:
             plot_data = self._generate_specific_plot(
-                plot_name, history, y_train, y_pred_train, y_test, y_pred_test, 
+                plot_name, history, y_train, y_pred_train, y_test, y_pred_test,
                 original_prices, session_id
             )
             if plot_data:
                 plots[plot_name] = plot_data
-        
+
         return plots
 
 

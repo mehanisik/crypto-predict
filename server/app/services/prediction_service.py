@@ -12,20 +12,20 @@ logger = get_logger(__name__)
 class PredictionService:
     def __init__(self):
         pass
-    
+
     def make_prediction(self, **kwargs) -> Dict[str, Any]:
         # RORO pattern: Extract parameters
         ticker = kwargs.get('ticker')
         start_date = kwargs.get('start_date')
         days = kwargs.get('days')
         request_id = kwargs.get('request_id')
-        
+
         if not all([ticker, start_date, days, request_id]):
             return {
                 'success': False,
                 'error': 'Missing required parameters: ticker, start_date, days, request_id'
             }
-        
+
         try:
             # Parse start_date to date
             if isinstance(start_date, str):
@@ -93,22 +93,21 @@ class PredictionService:
                     mean_target = float(mean_arr)
                     std_target = float(std_arr_safe)
                 normalized = (close - mean_target) / (std_target if std_target != 0 else 1.0)
+            # Multi-feature path: align number of features if needed
+            elif mean_arr.ndim == 0:
+                normalized = (features - float(mean_arr)) / float(std_arr_safe)
             else:
-                # Multi-feature path: align number of features if needed
-                if mean_arr.ndim == 0:
-                    normalized = (features - float(mean_arr)) / float(std_arr_safe)
+                # If saved stats have more features than model expects, slice to match
+                if mean_arr.size >= expected_features:
+                    mean_use = mean_arr[:expected_features]
+                    std_use = std_arr_safe[:expected_features]
+                    feats_use = features[:, :expected_features]
                 else:
-                    # If saved stats have more features than model expects, slice to match
-                    if mean_arr.size >= expected_features:
-                        mean_use = mean_arr[:expected_features]
-                        std_use = std_arr_safe[:expected_features]
-                        feats_use = features[:, :expected_features]
-                    else:
-                        # Fallback: use as many as available
-                        mean_use = mean_arr
-                        std_use = std_arr_safe
-                        feats_use = features[:, :mean_arr.size]
-                    normalized = (feats_use - mean_use) / std_use
+                    # Fallback: use as many as available
+                    mean_use = mean_arr
+                    std_use = std_arr_safe
+                    feats_use = features[:, :mean_arr.size]
+                normalized = (feats_use - mean_use) / std_use
 
             if len(normalized) < lookback:
                 raise ValueError(f'Insufficient data to form lookback window ({lookback})')
@@ -164,5 +163,5 @@ class PredictionService:
                         exc_info=True)
             return {
                 'success': False,
-                'error': f'Prediction failed: {str(e)}'
+                'error': f'Prediction failed: {e!s}'
             }

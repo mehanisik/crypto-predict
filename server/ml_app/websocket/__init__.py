@@ -1,3 +1,3 @@
 from .manager import WebSocketManager
 
-__all__ = ['WebSocketManager'] 
+__all__ = ['WebSocketManager']

@@ -7,7 +7,7 @@ class MetricsCalculator:
     logger = structlog.get_logger(__name__)
 
     @classmethod
-    def calculate_metrics(cls, y_true: np.ndarray, y_pred: np.ndarray, 
+    def calculate_metrics(cls, y_true: np.ndarray, y_pred: np.ndarray,
                          mean: np.ndarray, std: np.ndarray) -> Dict[str, float]:
         """
         Calculate prediction metrics with support for multi-feature normalization.
@@ -36,17 +36,17 @@ class MetricsCalculator:
                 close_std = std
             y_true_denorm = y_true * close_std + close_mean
             y_pred_denorm = y_pred * close_std + close_mean
-        
+
         # Calculate metrics
         mae = np.mean(np.abs(y_true_denorm - y_pred_denorm))
         mse = mean_squared_error(y_true_denorm, y_pred_denorm)
         rmse = np.sqrt(mse)
         r2 = r2_score(y_true_denorm, y_pred_denorm)
-        
+
         # Calculate MAPE (Mean Absolute Percentage Error)
         # Avoid division by zero
         mape = np.mean(np.abs((y_true_denorm - y_pred_denorm) / np.where(y_true_denorm != 0, y_true_denorm, 1))) * 100
-        
+
         metrics = {
             'mae': float(mae),
             'rmse': float(rmse),
@@ -54,7 +54,7 @@ class MetricsCalculator:
             'mape': float(mape),
             'mse': float(mse)
         }
-        
+
         cls.logger.info("metrics_calculated", **metrics)
         return metrics
-    
+

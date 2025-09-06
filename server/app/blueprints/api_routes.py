@@ -1,16 +1,15 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from flask import request, current_app
 from flask_restful import Resource, Api
 from marshmallow import ValidationError
 from sqlalchemy import text
-import structlog
 from flasgger import swag_from
 
 from app.blueprints import api_bp
 from app.models import Prediction, TrainingSession, ModelConfiguration
 from app.models.training import TrainingStatus
 from app.schemas import (
-    PredictionRequestSchema, 
+    PredictionRequestSchema,
     TrainingRequestSchema,
     PredictionResponseSchema,
     TrainingResponseSchema
@@ -23,7 +22,6 @@ from app.utils.exceptions import (
     ValidationError as CustomValidationError,
     TrainingError,
     PredictionError,
-    ModelNotFoundError,
     DatabaseError
 )
 from app.middleware import rate_limit
@@ -35,7 +33,7 @@ logger = get_logger(__name__)
 
 
 class HealthCheckResource(Resource):
-    @rate_limit('health')  # Use a more restrictive rate limit for health checks
+    @rate_limit('health')
     @swag_from({
         'tags': ['System'],
         'summary': 'Get API health status',
@@ -47,18 +45,18 @@ class HealthCheckResource(Resource):
                     'type': 'object',
                     'properties': {
                         'status': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': 'healthy',
                             'enum': ['healthy', 'degraded', 'unhealthy'],
                             'description': 'Overall system health status'
                         },
                         'timestamp': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': '2024-01-15T10:30:00Z',
                             'description': 'ISO timestamp of the health check'
                         },
                         'version': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': '1.0.0',
                             'description': 'API version'
                         },
@@ -66,13 +64,13 @@ class HealthCheckResource(Resource):
                             'type': 'object',
                             'properties': {
                                 'database': {
-                                    'type': 'string', 
+                                    'type': 'string',
                                     'example': 'healthy',
                                     'enum': ['healthy', 'unhealthy'],
                                     'description': 'Database connection status'
                                 },
                                 'training_service': {
-                                    'type': 'string', 
+                                    'type': 'string',
                                     'example': 'healthy',
                                     'enum': ['healthy', 'unhealthy'],
                                     'description': 'Training service status'
@@ -80,7 +78,7 @@ class HealthCheckResource(Resource):
                             }
                         },
                         'uptime': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': '2 days, 5 hours, 30 minutes',
                             'description': 'System uptime'
                         }
@@ -103,33 +101,33 @@ class HealthCheckResource(Resource):
                     'type': 'object',
                     'properties': {
                         'status': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': 'degraded',
                             'enum': ['degraded', 'unhealthy']
                         },
                         'timestamp': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': '2024-01-15T10:30:00Z'
                         },
                         'version': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': '1.0.0'
                         },
                         'services': {
                             'type': 'object',
                             'properties': {
                                 'database': {
-                                    'type': 'string', 
+                                    'type': 'string',
                                     'example': 'unhealthy'
                                 },
                                 'training_service': {
-                                    'type': 'string', 
+                                    'type': 'string',
                                     'example': 'healthy'
                                 }
                             }
                         },
                         'uptime': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': '2 days, 5 hours, 30 minutes'
                         }
                     }
@@ -150,23 +148,21 @@ class HealthCheckResource(Resource):
     def get(self):
         """Get API health status."""
         try:
-            # Check database connection
             db.session.execute(text('SELECT 1'))
             db_status = 'healthy'
         except Exception as e:
             logger.error("database_health_check_failed", error=str(e))
             db_status = 'unhealthy'
-        
-        # Check training service
+
         try:
             training_service = TrainingService()
             training_status = 'healthy'
         except Exception as e:
             logger.error("training_service_health_check_failed", error=str(e))
             training_status = 'unhealthy'
-        
+
         overall_status = 'healthy' if all([db_status == 'healthy', training_status == 'healthy']) else 'degraded'
-        
+
         return {
             'status': overall_status,
             'timestamp': datetime.now().isoformat(),
@@ -181,12 +177,12 @@ class HealthCheckResource(Resource):
 
 class PredictionResource(Resource):
     """Prediction endpoint for crypto price predictions."""
-    
+
     def __init__(self):
         self.prediction_service = PredictionService()
         self.schema = PredictionRequestSchema()
         self.response_schema = PredictionResponseSchema()
-    
+
     @rate_limit('prediction')
     @swag_from({
         'tags': ['Predictions'],
@@ -201,19 +197,19 @@ class PredictionResource(Resource):
                     'type': 'object',
                     'properties': {
                         'ticker': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': 'BTC-USD',
                             'description': 'Cryptocurrency ticker symbol (e.g., BTC-USD, ETH-USD, SOL-USD)',
                             'maxLength': 20
                         },
                         'start_date': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': '2024-01-01',
                             'description': 'Start date for prediction (YYYY-MM-DD format)',
                             'format': 'date'
                         },
                         'days': {
-                            'type': 'integer', 
+                            'type': 'integer',
                             'example': 7,
                             'minimum': 1,
                             'maximum': 30,
@@ -311,22 +307,20 @@ class PredictionResource(Resource):
     def post(self):
         """Create a new prediction."""
         request_id = generate_request_id()
-        
+
         try:
-            # Validate request data
             try:
                 data = self.schema.load(request.get_json())
             except ValidationError as e:
-                logger.warning("prediction_validation_failed", 
-                              request_id=request_id, 
+                logger.warning("prediction_validation_failed",
+                              request_id=request_id,
                               errors=e.messages)
                 return {
                     'error': 'Validation failed',
                     'error_code': 'VALIDATION_ERROR',
                     'details': e.messages
                 }, 400
-            
-            # Validate business rules
+
             if data['days'] > current_app.config.get('MAX_PREDICTION_DAYS', 30):
                 return {
                     'error': 'Prediction days exceed maximum allowed',
@@ -336,55 +330,49 @@ class PredictionResource(Resource):
                         'requested_days': data['days']
                     }
                 }, 400
-            
-            # Make prediction
+
             prediction_result = self.prediction_service.make_prediction(
                 ticker=data['ticker'],
                 start_date=data['start_date'],
                 days=data['days'],
                 request_id=request_id
             )
-            
+
             if not prediction_result['success']:
                 raise PredictionError(
                     message=prediction_result['error'],
                     ticker=data['ticker'],
                     model_type='LSTM'  # Default model type
                 )
-            
-            # Store prediction in database (but don't fail if storage fails)
+
             try:
-                # Temporarily disabled database storage to fix the duplicate request_id issue
-                # self._store_prediction(prediction_result['data'], request_id)
-                logger.info("prediction_storage_skipped_temporarily", 
+                logger.info("prediction_storage_skipped_temporarily",
                           request_id=request_id,
                           reason="Database storage temporarily disabled")
             except Exception as storage_error:
-                logger.warning("prediction_storage_failed_but_continuing", 
+                logger.warning("prediction_storage_failed_but_continuing",
                               request_id=request_id,
                               error=str(storage_error))
-                # Continue with the response even if storage fails
-            
-            # Prepare response
+
             response_data = self.response_schema.dump({
                 'request_id': request_id,
                 'status': 'success',
                 'data': prediction_result['data']
             })
-            
-            logger.info("prediction_successful", 
+
+            logger.info("prediction_successful",
                        request_id=request_id,
                        ticker=data['ticker'],
                        predictions_count=len(prediction_result['data']['predictions']))
-            
+
             return response_data, 200
-            
+
         except CustomValidationError as e:
             return e.to_dict(), 400
         except PredictionError as e:
             return e.to_dict(), 400
         except Exception as e:
-            logger.error("prediction_error", 
+            logger.error("prediction_error",
                         request_id=request_id,
                         error=str(e),
                         exc_info=True)
@@ -393,16 +381,15 @@ class PredictionResource(Resource):
                 'error_code': 'INTERNAL_ERROR',
                 'message': 'An unexpected error occurred while processing your prediction'
             }, 500
-    
+
     def _store_prediction(self, prediction_data: dict, request_id: str) -> None:
         """Store prediction results in database."""
         try:
             from datetime import datetime
-            
+
             for pred in prediction_data['predictions']:
-                # Convert date string to date object
                 prediction_date = datetime.fromisoformat(pred['date']).date()
-                
+
                 prediction = Prediction(
                     request_id=request_id,
                     ticker=prediction_data['ticker'],
@@ -412,30 +399,28 @@ class PredictionResource(Resource):
                     confidence_score=pred.get('confidence')
                 )
                 db.session.add(prediction)
-            
+
             db.session.commit()
             logger.info("prediction_stored", request_id=request_id)
-            
+
         except Exception as e:
-            logger.error("prediction_storage_failed", 
+            logger.error("prediction_storage_failed",
                         request_id=request_id,
                         error=str(e))
             db.session.rollback()
-            # Don't raise an error, just log it and continue
-            # This allows the prediction to succeed even if storage fails
-            logger.warning("prediction_storage_skipped", 
+            logger.warning("prediction_storage_skipped",
                           request_id=request_id,
                           reason="Database storage failed, but prediction completed successfully")
 
 
 class TrainingResource(Resource):
     """Training endpoint for model training."""
-    
+
     def __init__(self):
         self.training_service = TrainingService()
         self.schema = TrainingRequestSchema()
         self.response_schema = TrainingResponseSchema()
-    
+
     @rate_limit('training')
     @swag_from({
         'tags': ['Training'],
@@ -450,52 +435,52 @@ class TrainingResource(Resource):
                     'type': 'object',
                     'properties': {
                         'ticker': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': 'BTC-USD',
                             'description': 'Cryptocurrency ticker symbol (e.g., BTC-USD, ETH-USD, SOL-USD, ADA-USD)',
                             'maxLength': 20
                         },
                         'model_type': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': 'LSTM',
                             'enum': ['LSTM', 'CNN', 'CNN-LSTM', 'LSTM-CNN'],
                             'description': 'Type of machine learning model to use'
                         },
                         'start_date': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': '2023-01-01',
                             'description': 'Start date for training data (YYYY-MM-DD format)',
                             'format': 'date'
                         },
                         'end_date': {
-                            'type': 'string', 
+                            'type': 'string',
                             'example': '2024-01-01',
                             'description': 'End date for training data (YYYY-MM-DD format)',
                             'format': 'date'
                         },
                         'lookback': {
-                            'type': 'integer', 
+                            'type': 'integer',
                             'example': 30,
                             'minimum': 10,
                             'maximum': 365,
                             'description': 'Number of days to look back for training (10-365 days)'
                         },
                         'epochs': {
-                            'type': 'integer', 
+                            'type': 'integer',
                             'example': 100,
                             'minimum': 1,
                             'maximum': 1000,
                             'description': 'Number of training epochs (1-1000)'
                         },
                         'batch_size': {
-                            'type': 'integer', 
+                            'type': 'integer',
                             'example': 32,
                             'minimum': 8,
                             'maximum': 256,
                             'description': 'Training batch size (8-256, optional)'
                         },
                         'learning_rate': {
-                            'type': 'number', 
+                            'type': 'number',
                             'example': 0.001,
                             'minimum': 0.0001,
                             'maximum': 0.1,
@@ -586,36 +571,33 @@ class TrainingResource(Resource):
     def post(self):
         """Start a new training session."""
         request_id = generate_request_id()
-        
+
         logger.info("=== TRAINING REQUEST START ===", request_id=request_id)
-        
+
         try:
-            # Log incoming request
             request_data = request.get_json()
-            logger.info("training_request_received", 
-                       request_id=request_id, 
+            logger.info("training_request_received",
+                       request_id=request_id,
                        data=request_data)
-            
-            # Validate request data
+
             try:
                 data = self.schema.load(request_data)
-                logger.info("training_validation_success", 
-                           request_id=request_id, 
+                logger.info("training_validation_success",
+                           request_id=request_id,
                            validated_data=data)
             except ValidationError as e:
-                logger.warning("training_validation_failed", 
-                              request_id=request_id, 
+                logger.warning("training_validation_failed",
+                              request_id=request_id,
                               errors=e.messages)
                 return {
                     'error': 'Validation failed',
                     'error_code': 'VALIDATION_ERROR',
                     'details': e.messages
                 }, 400
-            
-            # Validate business rules
+
             if data['epochs'] > current_app.config.get('MAX_EPOCHS', 1000):
-                logger.warning("training_epochs_exceeded", 
-                              request_id=request_id, 
+                logger.warning("training_epochs_exceeded",
+                              request_id=request_id,
                               requested_epochs=data['epochs'],
                               max_epochs=current_app.config.get('MAX_EPOCHS', 1000))
                 return {
@@ -626,20 +608,19 @@ class TrainingResource(Resource):
                         'requested_epochs': data['epochs']
                     }
                 }, 400
-            
-            # Check training session limits
+
             active_sessions = TrainingSession.query.filter_by(
                 status=TrainingStatus.IN_PROGRESS
             ).count()
-            
+
             max_sessions = current_app.config.get('MAX_TRAINING_SESSIONS', 10)
-            logger.info("training_session_check", 
+            logger.info("training_session_check",
                        request_id=request_id,
                        active_sessions=active_sessions,
                        max_sessions=max_sessions)
-            
+
             if active_sessions >= max_sessions:
-                logger.warning("training_sessions_limit_exceeded", 
+                logger.warning("training_sessions_limit_exceeded",
                               request_id=request_id,
                               active_sessions=active_sessions,
                               max_sessions=max_sessions)
@@ -651,32 +632,30 @@ class TrainingResource(Resource):
                         'active_sessions': active_sessions
                     }
                 }, 429
-            
-            logger.info("creating_training_session", 
-                       request_id=request_id, 
+
+            logger.info("creating_training_session",
+                       request_id=request_id,
                        ticker=data['ticker'])
-            
-            # Create training session
+
             training_session = self._create_training_session(data, request_id)
-            logger.info("training_session_created", 
+            logger.info("training_session_created",
                        request_id=request_id,
                        session_id=training_session.session_id)
-            
+
             logger.info("calling_training_service", request_id=request_id)
-            
-            # Start training
+
             training_result = self.training_service.start_training(
                 session_id=request_id,
                 training_data=data,
                 websocket_manager=socketio
             )
-            
-            logger.info("training_service_result", 
-                       request_id=request_id, 
+
+            logger.info("training_service_result",
+                       request_id=request_id,
                        result=training_result)
-            
+
             if not training_result['success']:
-                logger.error("training_service_failed", 
+                logger.error("training_service_failed",
                             request_id=request_id,
                             error=training_result['error'])
                 raise TrainingError(
@@ -684,36 +663,35 @@ class TrainingResource(Resource):
                     session_id=request_id,
                     stage='startup'
                 )
-            
-            # Prepare response
+
             response_data = self.response_schema.dump({
                 'request_id': request_id,
                 'status': 'training_started',
                 'session_id': request_id,
                 'message': 'Training started successfully'
             })
-            
-            logger.info("training_started_successfully", 
+
+            logger.info("training_started_successfully",
                        request_id=request_id,
                        ticker=data['ticker'],
                        model_type=data['model_type'],
                        response=response_data)
-            
+
             logger.info("=== TRAINING REQUEST SUCCESS ===", request_id=request_id)
             return response_data, 202
-            
+
         except CustomValidationError as e:
-            logger.error("training_custom_validation_error", 
+            logger.error("training_custom_validation_error",
                         request_id=request_id,
                         error=e.to_dict())
             return e.to_dict(), 400
         except TrainingError as e:
-            logger.error("training_error", 
+            logger.error("training_error",
                         request_id=request_id,
                         error=e.to_dict())
             return e.to_dict(), 400
         except Exception as e:
-            logger.error("training_unexpected_error", 
+            logger.error("training_unexpected_error",
                         request_id=request_id,
                         error=str(e),
                         exc_info=True)
@@ -724,16 +702,16 @@ class TrainingResource(Resource):
             }, 500
         finally:
             logger.info("=== TRAINING REQUEST END ===", request_id=request_id)
-    
+
     def _create_training_session(self, training_data: dict, session_id: str) -> TrainingSession:
         """Create a new training session with configuration."""
         try:
             from datetime import datetime
-            
+
             # Always create a new configuration with unique hash using session_id
             import time
             unique_suffix = str(int(time.time() * 1000000))[-6:]  # Last 6 digits of microseconds
-            
+
             # Generate base hash and add unique suffix
             base_hash = ModelConfiguration.generate_hash(
                 model_type=training_data['model_type'],
@@ -744,7 +722,7 @@ class TrainingResource(Resource):
                 learning_rate=training_data.get('learning_rate', 0.001)
             )
             config_hash = f"{base_hash}_{session_id}_{unique_suffix}"
-            
+
             config = ModelConfiguration(
                 config_hash=config_hash,
                 model_type=training_data['model_type'],
@@ -754,13 +732,13 @@ class TrainingResource(Resource):
                 batch_size=training_data.get('batch_size', 32),
                 learning_rate=training_data.get('learning_rate', 0.001)
             )
-            
+
             db.session.add(config)
             db.session.flush()
-            logger.info("created_new_config", 
-                       config_id=config.id, 
+            logger.info("created_new_config",
+                       config_id=config.id,
                        config_hash=config_hash)
-            
+
             now = datetime.now()
             session = TrainingSession(
                 session_id=session_id,
@@ -776,18 +754,18 @@ class TrainingResource(Resource):
                 created_at=now,
                 updated_at=now
             )
-            
+
             db.session.add(session)
             db.session.commit()
-            
-            logger.info("training_session_created", 
+
+            logger.info("training_session_created",
                        session_id=session_id,
                        config_id=config.id)
-            
+
             return session
-            
+
         except Exception as e:
-            logger.error("training_session_creation_failed", 
+            logger.error("training_session_creation_failed",
                         session_id=session_id,
                         error=str(e))
             db.session.rollback()
@@ -800,10 +778,10 @@ class TrainingResource(Resource):
 
 class TrainingStatusResource(Resource):
     """Training status endpoint."""
-    
+
     def __init__(self):
         self.training_service = TrainingService()
-    
+
     @rate_limit('default')
     @swag_from({
         'tags': ['Training'],
@@ -899,9 +877,9 @@ class TrainingStatusResource(Resource):
                         'message': 'The specified training session was not found'
                     }
                 }, 404
-                
+
         except Exception as e:
-            logger.error("training_status_error", 
+            logger.error("training_status_error",
                         session_id=session_id,
                         error=str(e),
                         exc_info=True)
@@ -914,10 +892,10 @@ class TrainingStatusResource(Resource):
 
 class TrainingCancelResource(Resource):
     """Training cancellation endpoint."""
-    
+
     def __init__(self):
         self.training_service = TrainingService()
-    
+
     @rate_limit('training')
     @swag_from({
         'tags': ['Training'],
@@ -1014,9 +992,9 @@ class TrainingCancelResource(Resource):
                         'message': result['error']
                     }
                 }, 400
-                
+
         except Exception as e:
-            logger.error("training_cancel_error", 
+            logger.error("training_cancel_error",
                         session_id=session_id,
                         error=str(e),
                         exc_info=True)
@@ -1029,10 +1007,10 @@ class TrainingCancelResource(Resource):
 
 class RunningTrainingsResource(Resource):
     """Running trainings endpoint."""
-    
+
     def __init__(self):
         self.training_service = TrainingService()
-    
+
     @rate_limit('default')
     @swag_from({
         'tags': ['Training'],
@@ -1116,9 +1094,9 @@ class RunningTrainingsResource(Resource):
                 'count': len(running_trainings),
                 'max_sessions': current_app.config.get('MAX_TRAINING_SESSIONS', 10)
             }, 200
-                
+
         except Exception as e:
-            logger.error("running_trainings_error", 
+            logger.error("running_trainings_error",
                         error=str(e),
                         exc_info=True)
             return {
@@ -1174,7 +1152,6 @@ class WebSocketTestResource(Resource):
     def post(self):
         """Emit a test WebSocket message to a training room."""
         try:
-            from app.services.training_service import TrainingService
             from ml_app.websocket.manager import WebSocketManager
 
             data = request.get_json()
