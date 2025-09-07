@@ -53,5 +53,5 @@ export async function makePrediction(
 	payload: PredictionPayload,
 ): Promise<PredictionResponse> {
 	const res = await server.post(API_ENDPOINTS.PREDICT, payload);
-	return res.data as PredictionResponse;
+	return res.data.data as PredictionResponse;
 }

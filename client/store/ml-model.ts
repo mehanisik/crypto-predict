@@ -5,6 +5,7 @@ import {
 	type PredictionParams,
 	type ConnectionState,
 	type MlMessage,
+	type PredictionResponse,
 } from "@/types/ml-model";
 
 interface MlModelState {
@@ -12,6 +13,7 @@ interface MlModelState {
 	connection: ConnectionState;
 	training: TrainingParams;
 	prediction: PredictionParams;
+	predictionResults: PredictionResponse | null;
 	messages: MlMessage[];
 	plots: Record<string, string>;
 	seriesMap: Record<string, number[]>;
@@ -21,6 +23,7 @@ interface MlModelState {
 	setConnection: (partial: Partial<ConnectionState>) => void;
 	setTraining: (partial: Partial<TrainingParams>) => void;
 	setPrediction: (partial: Partial<PredictionParams>) => void;
+	setPredictionResults: (results: PredictionResponse | null) => void;
 	addMessage: (m: MlMessage) => void;
 	clearMessages: () => void;
 	setPlots: (
@@ -50,6 +53,7 @@ export const useMlModelStore = create<MlModelState>((set) => ({
 		predStartDate: "2024-01-02",
 		predDays: 7,
 	},
+	predictionResults: null,
 	messages: [],
 	plots: {},
 	seriesMap: {},
@@ -63,6 +67,7 @@ export const useMlModelStore = create<MlModelState>((set) => ({
 		set((state) => ({ training: { ...state.training, ...partial } })),
 	setPrediction: (partial) =>
 		set((state) => ({ prediction: { ...state.prediction, ...partial } })),
+	setPredictionResults: (results) => set({ predictionResults: results }),
 	addMessage: (m) =>
 		set((state) => {
 			const next = [...state.messages, m];

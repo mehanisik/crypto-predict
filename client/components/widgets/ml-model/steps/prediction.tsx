@@ -12,7 +12,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { useActionState } from "react";
+import { useState } from "react";
 import { useMlModelStore } from "@/store";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -29,8 +29,15 @@ interface FormValues {
 export function PredictionStep() {
 	const training = useMlModelStore((s) => s.training);
 	const prediction = useMlModelStore((s) => s.prediction);
+	const predictionResults = useMlModelStore((s) => s.predictionResults);
 	const setPrediction = useMlModelStore((s) => s.setPrediction);
+	const setPredictionResults = useMlModelStore((s) => s.setPredictionResults);
 	const isTrainingComplete = useMlModelStore((s) => s.isTrainingComplete);
+
+	// Debug logging
+	console.log("🔮 Store predictionResults:", predictionResults);
+	console.log("🔮 Store predictions array:", predictionResults?.predictions);
+	console.log("🔮 Store predictions length:", predictionResults?.predictions?.length);
 
 	const form = useForm<FormValues>({
 		resolver: zodResolver(predictionSchema),
@@ -40,32 +47,35 @@ export function PredictionStep() {
 		},
 	});
 
-	type PredictState = {
-		ok: boolean;
-		error?: string;
-		result?: PredictionResponse;
+	const [isLoading, setIsLoading] = useState(false);
+	const [error, setError] = useState<string | null>(null);
+
+	const handleSubmit = async (formData: FormData) => {
+		try {
+			setIsLoading(true);
+			setError(null);
+			
+			const startDate = String(
+				formData.get("startDate") || prediction.predStartDate,
+			);
+			const days = Number(formData.get("days") || prediction.predDays);
+			const payload = {
+				ticker: training.ticker,
+				start_date: startDate,
+				days,
+			};
+			const result = await makePrediction(payload);
+			console.log("🔮 Prediction result:", result);
+			console.log("🔮 Predictions array:", result.predictions);
+			console.log("🔮 Predictions length:", result.predictions?.length);
+			setPredictionResults(result);
+		} catch (e: any) {
+			console.error("🔮 Prediction error:", e);
+			setError(e?.message || "Prediction failed");
+		} finally {
+			setIsLoading(false);
+		}
 	};
-	const [state, formAction, pending] = useActionState<PredictState, FormData>(
-		async (_prev, formData) => {
-			try {
-				const startDate = String(
-					formData.get("startDate") || prediction.predStartDate,
-				);
-				const days = Number(formData.get("days") || prediction.predDays);
-				const payload = {
-					ticker: training.ticker,
-					start_date: startDate,
-					days,
-				};
-				const result = await makePrediction(payload);
-				return { ok: true, result };
-			} catch (e: any) {
-				console.error("🔮 Prediction error:", e);
-				return { ok: false, error: e?.message || "Prediction failed" };
-			}
-		},
-		{ ok: false },
-	);
 
 	const onLocalChange = (values: Partial<FormValues>) => {
 		if (values.startDate !== undefined)
@@ -112,13 +122,17 @@ export function PredictionStep() {
 					</CardDescription>
 				</CardHeader>
 				<CardContent className="space-y-4">
-					{state.error && (
+					{error && (
 						<Alert variant="destructive">
-							<AlertDescription>{state.error}</AlertDescription>
+							<AlertDescription>{error}</AlertDescription>
 						</Alert>
 					)}
 
-					<form action={formAction} className="space-y-4">
+					<form onSubmit={(e) => {
+						e.preventDefault();
+						const formData = new FormData(e.currentTarget);
+						handleSubmit(formData);
+					}} className="space-y-4">
 						<input type="hidden" name="ticker" value={training.ticker} />
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<div className="space-y-2">
@@ -168,16 +182,16 @@ export function PredictionStep() {
 
 						<Button
 							type="submit"
-							disabled={!isTrainingComplete || pending}
+							disabled={!isTrainingComplete || isLoading}
 							className="w-full"
 						>
-							{pending ? "Generating Predictions..." : "Generate Predictions"}
+							{isLoading ? "Generating Predictions..." : "Generate Predictions"}
 						</Button>
 					</form>
 				</CardContent>
 			</Card>
 
-			{state.ok && state.result ? (
+			{predictionResults ? (
 				<Card>
 					<CardHeader className="pb-4">
 						<CardTitle className="text-base flex items-center justify-between">
@@ -186,38 +200,38 @@ export function PredictionStep() {
 								Prediction Results
 							</span>
 							<Badge variant="outline" className="text-xs">
-								{state.result.ticker} • {state.result.predictions?.length ?? 0}{" "}
+								{predictionResults.ticker} • {predictionResults.predictions?.length ?? 0}{" "}
 								predictions
 							</Badge>
 						</CardTitle>
-						{state.result.data_range && (
+						{predictionResults.data_range && (
 							<div className="text-xs text-muted-foreground mt-2">
 								<span className="font-medium">Data Range:</span>{" "}
-								{state.result.data_range.start_date} to{" "}
-								{state.result.data_range.end_date} •
+								{predictionResults.data_range.start_date} to{" "}
+								{predictionResults.data_range.end_date} •
 								<span className="font-medium ml-2">Predictions:</span>{" "}
-								{state.result.data_range.prediction_start} onwards
+								{predictionResults.data_range.prediction_start} onwards
 							</div>
 						)}
-						{state.result.model_config && (
+						{predictionResults.model_config && (
 							<div className="text-xs text-muted-foreground mt-1">
 								<span className="font-medium">Model:</span>{" "}
-								{state.result.model_config.model_type} •
+								{predictionResults.model_config.model_type} •
 								<span className="font-medium ml-2">Lookback:</span>{" "}
-								{state.result.model_config.lookback_days} days •
+								{predictionResults.model_config.lookback_days} days •
 								<span className="font-medium ml-2">Epochs:</span>{" "}
-								{state.result.model_config.epochs}
+								{predictionResults.model_config.epochs}
 							</div>
 						)}
 					</CardHeader>
 					<CardContent>
-						{state.result.predictions && state.result.predictions.length > 0 ? (
+						{predictionResults.predictions && predictionResults.predictions.length > 0 ? (
 							<div className="space-y-4">
 								<div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/20 rounded-lg">
 									<div className="text-center">
 										<div className="text-lg font-semibold text-green-600">
 											$
-											{state.result.predictions[0]?.predicted_price?.toFixed(
+											{predictionResults.predictions[0]?.predicted_price?.toFixed(
 												0,
 											) || "N/A"}
 										</div>
@@ -228,8 +242,8 @@ export function PredictionStep() {
 									<div className="text-center">
 										<div className="text-lg font-semibold text-blue-600">
 											$
-											{state.result.predictions[
-												state.result.predictions.length - 1
+											{predictionResults.predictions[
+												predictionResults.predictions.length - 1
 											]?.predicted_price?.toFixed(0) || "N/A"}
 										</div>
 										<div className="text-xs text-muted-foreground">
@@ -239,7 +253,7 @@ export function PredictionStep() {
 									<div className="text-center">
 										<div className="text-lg font-semibold text-purple-600">
 											{(
-												(state.result.predictions[0]?.confidence_score || 0) *
+												(predictionResults.predictions[0]?.confidence_score || 0) *
 												100
 											).toFixed(0)}
 											%
@@ -250,7 +264,7 @@ export function PredictionStep() {
 									</div>
 									<div className="text-center">
 										<div className="text-lg font-semibold text-orange-600">
-											{state.result.predictions.length}
+											{predictionResults.predictions.length}
 										</div>
 										<div className="text-xs text-muted-foreground">
 											Total Days
@@ -259,7 +273,7 @@ export function PredictionStep() {
 								</div>
 
 								<div className="max-h-80 overflow-auto space-y-2">
-									{state.result.predictions.map((p) => (
+									{predictionResults.predictions.map((p) => (
 										<div
 											key={p.date}
 											className="p-3 rounded-lg border bg-card hover:bg-muted/50 transition-colors"
@@ -313,26 +327,6 @@ export function PredictionStep() {
 								<p className="text-xs mt-1">Try generating predictions first</p>
 							</div>
 						)}
-					</CardContent>
-				</Card>
-			) : state.ok ? (
-				<Card>
-					<CardHeader className="pb-4">
-						<CardTitle className="text-base flex items-center gap-2">
-							<TrendingUp className="h-4 w-4" />
-							Prediction Results
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="text-center py-8 text-muted-foreground">
-							<BarChart3 className="h-8 w-8 mx-auto mb-2 opacity-50" />
-							<p className="text-sm">
-								Prediction completed but no results found
-							</p>
-							<p className="text-xs mt-1">
-								Check the server logs for more details
-							</p>
-						</div>
 					</CardContent>
 				</Card>
 			) : null}

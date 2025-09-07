@@ -1,6 +1,5 @@
 "use client";
 
-import { PlotGrid } from "@/components/charts/plot-grid";
 import {
 	LineChart as ReLineChart,
 	Line,
@@ -21,18 +20,16 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, Image, TrendingUp, Activity } from "lucide-react";
+import { BarChart3, TrendingUp, Activity } from "lucide-react";
 
 import { useMlModelStore } from "@/store";
 
 export function TrainingCharts() {
-	const plots = useMlModelStore((s) => s.plots);
 	const seriesMap = useMlModelStore((s) => s.seriesMap);
 
-	const hasPlots = Object.keys(plots).length > 0;
 	const hasMetrics = Object.keys(seriesMap).length > 0;
 
-	if (!hasPlots && !hasMetrics) {
+	if (!hasMetrics) {
 		return (
 			<Card className="h-full">
 				<CardContent className="flex items-center justify-center h-full min-h-[300px]">
@@ -52,28 +49,6 @@ export function TrainingCharts() {
 			<Card className="flex-1 min-h-0">
 				<CardHeader className="pb-4 flex-shrink-0">
 					<CardTitle className="text-base flex items-center gap-2">
-						<Image className="h-4 w-4" />
-						Training Plots
-						{hasPlots && (
-							<Badge variant="secondary" className="ml-1">
-								{Object.keys(plots).length}
-							</Badge>
-						)}
-					</CardTitle>
-					<CardDescription className="text-sm">
-						Visualization of training progress and model performance
-					</CardDescription>
-				</CardHeader>
-				<CardContent className="flex-1 min-h-0">
-					<div className="h-full overflow-auto">
-						<PlotGrid plots={plots} />
-					</div>
-				</CardContent>
-			</Card>
-
-			<Card className="flex-1 min-h-0">
-				<CardHeader className="pb-4 flex-shrink-0">
-					<CardTitle className="text-base flex items-center gap-2">
 						<TrendingUp className="h-4 w-4" />
 						Training Metrics
 						{hasMetrics && (
@@ -88,135 +63,156 @@ export function TrainingCharts() {
 				</CardHeader>
 				<CardContent className="flex-1 min-h-0">
 					<div className="h-full overflow-auto space-y-6">
-						<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-							{(seriesMap.loss || seriesMap.val_loss) && (
-								<Card>
-									<CardHeader className="pb-3">
-										<CardTitle className="text-sm flex items-center gap-2">
+						{(seriesMap.loss || seriesMap.val_loss || seriesMap.accuracy || seriesMap.val_accuracy) && (
+							<Tabs defaultValue="loss" className="w-full">
+								<TabsList className="grid w-full grid-cols-2">
+									{(seriesMap.loss || seriesMap.val_loss) && (
+										<TabsTrigger value="loss" className="flex items-center gap-2">
 											<Activity className="h-4 w-4 text-red-500" />
 											Loss Metrics
-										</CardTitle>
-									</CardHeader>
-									<CardContent>
-										<div className="h-72">
-											<ResponsiveContainer width="100%" height="100%">
-												<ReLineChart
-													data={(
-														seriesMap.loss ||
-														seriesMap.val_loss ||
-														[]
-													).map((_, i) => ({
-														epoch: i + 1,
-														loss: seriesMap.loss
-															? seriesMap.loss[i]
-															: undefined,
-														val_loss: seriesMap.val_loss
-															? seriesMap.val_loss[i]
-															: undefined,
-													}))}
-													margin={{
-														top: 10,
-														right: 20,
-														left: 10,
-														bottom: 10,
-													}}
-												>
-													<CartesianGrid strokeDasharray="3 3" />
-													<XAxis dataKey="epoch" tick={{ fontSize: 10 }} />
-													<YAxis tick={{ fontSize: 10 }} />
-													<Tooltip />
-													<Legend />
-													{seriesMap.loss && (
-														<Line
-															type="monotone"
-															dataKey="loss"
-															stroke="#ef4444"
-															strokeWidth={2}
-															dot={false}
-															name="Training Loss"
-														/>
-													)}
-													{seriesMap.val_loss && (
-														<Line
-															type="monotone"
-															dataKey="val_loss"
-															stroke="#3b82f6"
-															strokeWidth={2}
-															dot={false}
-															name="Validation Loss"
-														/>
-													)}
-												</ReLineChart>
-											</ResponsiveContainer>
-										</div>
-									</CardContent>
-								</Card>
-							)}
-
-							{(seriesMap.accuracy || seriesMap.val_accuracy) && (
-								<Card>
-									<CardHeader className="pb-3">
-										<CardTitle className="text-sm flex items-center gap-2">
+										</TabsTrigger>
+									)}
+									{(seriesMap.accuracy || seriesMap.val_accuracy) && (
+										<TabsTrigger value="accuracy" className="flex items-center gap-2">
 											<TrendingUp className="h-4 w-4 text-green-500" />
 											Accuracy Metrics
-										</CardTitle>
-									</CardHeader>
-									<CardContent>
-										<div className="h-72">
-											<ResponsiveContainer width="100%" height="100%">
-												<ReLineChart
-													data={(
-														seriesMap.accuracy ||
-														seriesMap.val_accuracy ||
-														[]
-													).map((_, i) => ({
-														epoch: i + 1,
-														accuracy: seriesMap.accuracy
-															? seriesMap.accuracy[i]
-															: undefined,
-														val_accuracy: seriesMap.val_accuracy
-															? seriesMap.val_accuracy[i]
-															: undefined,
-													}))}
-													margin={{
-														top: 10,
-														right: 20,
-														left: 10,
-														bottom: 10,
-													}}
-												>
-													<CartesianGrid strokeDasharray="3 3" />
-													<XAxis dataKey="epoch" tick={{ fontSize: 10 }} />
-													<YAxis tick={{ fontSize: 10 }} />
-													<Tooltip />
-													<Legend />
-													{seriesMap.accuracy && (
-														<Line
-															type="monotone"
-															dataKey="accuracy"
-															stroke="#10b981"
-															strokeWidth={2}
-															dot={false}
-															name="Training Accuracy"
-														/>
-													)}
-													{seriesMap.val_accuracy && (
-														<Line
-															type="monotone"
-															dataKey="val_accuracy"
-															stroke="#a855f7"
-															strokeWidth={2}
-															dot={false}
-															name="Validation Accuracy"
-														/>
-													)}
-												</ReLineChart>
-											</ResponsiveContainer>
-										</div>
-									</CardContent>
-								</Card>
-							)}
-						</div>
+										</TabsTrigger>
+									)}
+								</TabsList>
+								
+								{(seriesMap.loss || seriesMap.val_loss) && (
+									<TabsContent value="loss" className="mt-4">
+										<Card>
+											<CardHeader className="pb-3">
+												<CardTitle className="text-sm flex items-center gap-2">
+													<Activity className="h-4 w-4 text-red-500" />
+													Loss Metrics
+												</CardTitle>
+											</CardHeader>
+											<CardContent>
+												<div className="h-80">
+													<ResponsiveContainer width="100%" height="100%">
+														<ReLineChart
+															data={(
+																seriesMap.loss ||
+																seriesMap.val_loss ||
+																[]
+															).map((_, i) => ({
+																epoch: i + 1,
+																loss: seriesMap.loss
+																	? seriesMap.loss[i]
+																	: undefined,
+																val_loss: seriesMap.val_loss
+																	? seriesMap.val_loss[i]
+																	: undefined,
+															}))}
+															margin={{
+																top: 10,
+																right: 20,
+																left: 10,
+																bottom: 10,
+															}}
+														>
+															<CartesianGrid strokeDasharray="3 3" />
+															<XAxis dataKey="epoch" tick={{ fontSize: 10 }} />
+															<YAxis tick={{ fontSize: 10 }} />
+															<Tooltip />
+															<Legend />
+															{seriesMap.loss && (
+																<Line
+																	type="monotone"
+																	dataKey="loss"
+																	stroke="#ef4444"
+																	strokeWidth={2}
+																	dot={false}
+																	name="Training Loss"
+																/>
+															)}
+															{seriesMap.val_loss && (
+																<Line
+																	type="monotone"
+																	dataKey="val_loss"
+																	stroke="#3b82f6"
+																	strokeWidth={2}
+																	dot={false}
+																	name="Validation Loss"
+																/>
+															)}
+														</ReLineChart>
+													</ResponsiveContainer>
+												</div>
+											</CardContent>
+										</Card>
+									</TabsContent>
+								)}
+
+								{(seriesMap.accuracy || seriesMap.val_accuracy) && (
+									<TabsContent value="accuracy" className="mt-4">
+										<Card>
+											<CardHeader className="pb-3">
+												<CardTitle className="text-sm flex items-center gap-2">
+													<TrendingUp className="h-4 w-4 text-green-500" />
+													Accuracy Metrics
+												</CardTitle>
+											</CardHeader>
+											<CardContent>
+												<div className="h-80">
+													<ResponsiveContainer width="100%" height="100%">
+														<ReLineChart
+															data={(
+																seriesMap.accuracy ||
+																seriesMap.val_accuracy ||
+																[]
+															).map((_, i) => ({
+																epoch: i + 1,
+																accuracy: seriesMap.accuracy
+																	? seriesMap.accuracy[i]
+																	: undefined,
+																val_accuracy: seriesMap.val_accuracy
+																	? seriesMap.val_accuracy[i]
+																	: undefined,
+															}))}
+															margin={{
+																top: 10,
+																right: 20,
+																left: 10,
+																bottom: 10,
+															}}
+														>
+															<CartesianGrid strokeDasharray="3 3" />
+															<XAxis dataKey="epoch" tick={{ fontSize: 10 }} />
+															<YAxis tick={{ fontSize: 10 }} />
+															<Tooltip />
+															<Legend />
+															{seriesMap.accuracy && (
+																<Line
+																	type="monotone"
+																	dataKey="accuracy"
+																	stroke="#10b981"
+																	strokeWidth={2}
+																	dot={false}
+																	name="Training Accuracy"
+																/>
+															)}
+															{seriesMap.val_accuracy && (
+																<Line
+																	type="monotone"
+																	dataKey="val_accuracy"
+																	stroke="#a855f7"
+																	strokeWidth={2}
+																	dot={false}
+																	name="Validation Accuracy"
+																/>
+															)}
+														</ReLineChart>
+													</ResponsiveContainer>
+												</div>
+											</CardContent>
+										</Card>
+									</TabsContent>
+								)}
+							</Tabs>
+						)}
 
 						{(seriesMap.mae || seriesMap.rmse) && (
 							<Card>

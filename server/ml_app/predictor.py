@@ -12,6 +12,7 @@ from .data.processor import DataProcessor
 from .models import CNNModel, LSTMModel, CNNLSTMModel, LSTMCNNModel
 from .websocket.manager import WebSocketManager
 from .data.metrics_calculator import MetricsCalculator
+from .visualization.visualizer import Visualizer
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 LATEST_MODEL_PATH = (BASE_DIR / "models" / "latest_model.joblib").resolve()
@@ -273,10 +274,25 @@ class CryptoPredictor:
                 # Emit history series first
                 if series:
                     self.websocket_manager.emit_series(session_id, series=series, meta={'kind': 'training_history'})
+                
                 # Emit prediction vs. actual series
                 self.websocket_manager.emit_series(session_id, series=series_predictions, meta={'kind': 'predictions_vs_actual'})
             except Exception as viz_err:
                 self.logger.warning("series_emit_failed", error=str(viz_err))
+
+            # Generate and emit plots
+            try:
+                plots = self._generate_visualizations(history, y_train, y_pred_train, y_test, y_pred_test, original_prices, session_id)
+                if plots:
+                    # Send plot URLs via websocket using emit_unified directly
+                    self.websocket_manager.emit_unified(
+                        session_id, 
+                        phase='visualize', 
+                        event='series', 
+                        data={'series': plots, 'meta': {'kind': 'plots'}}
+                    )
+            except Exception as plot_err:
+                self.logger.error("plot_generation_failed", session_id=session_id, error=str(plot_err), exc_info=True)
 
             # Save model state
             self._save_state()
@@ -531,8 +547,6 @@ class CryptoPredictor:
     def _generate_specific_plot(self, plot_name: str, history, y_train, y_pred_train, y_test, y_pred_test, original_prices, session_id: str):
         """Generate a specific plot with progress tracking"""
         try:
-            # Lazy import visualizer to avoid heavy imports
-            from .visualization.visualizer import Visualizer
 
             # Denormalize predictions
             if hasattr(self.data_processor, 'mean') and hasattr(self.data_processor, 'std'):
@@ -561,63 +575,27 @@ class CryptoPredictor:
             lookback = self.config.lookback
 
             # Generate specific plot based on name
-            if plot_name == 'training_history':
-                return Visualizer.plot_training_history(history, ax=None)
-            elif plot_name == 'predictions_vs_actual':
-                return Visualizer.plot_predictions_vs_actual(
-                    y_train_denorm, y_pred_train_denorm,
-                    y_test_denorm, y_pred_test_denorm, ax=None
-                )
-            elif plot_name == 'residuals':
-                return Visualizer.plot_residuals(
-                    y_train_denorm, y_pred_train_denorm,
-                    y_test_denorm, y_pred_test_denorm, ax=None
-                )
+            plot_url = None
+            if plot_name == 'loss_history':
+                plot_url = Visualizer.plot_loss_history(history, ax=None)
             elif plot_name == 'price_predictions':
-                return Visualizer.plot_predictions(
+                plot_url = Visualizer.plot_predictions(
                     original_prices, y_pred_train_denorm, y_pred_test_denorm,
                     train_size, lookback, mean_target, std_target, ax=None
                 )
-            elif plot_name == 'feature_importance':
-                return Visualizer.plot_feature_importance(
-                    y_train_denorm, y_pred_train_denorm, ax=None
-                )
-            elif plot_name == 'model_performance':
-                return Visualizer.plot_model_performance(
-                    y_train_denorm, y_pred_train_denorm,
-                    y_test_denorm, y_pred_test_denorm, ax=None
-                )
-            elif plot_name == 'data_distribution':
-                return Visualizer.plot_data_distribution(
-                    y_train_denorm, y_test_denorm, ax=None
-                )
-            elif plot_name == 'correlation_matrix':
-                return Visualizer.plot_correlation_matrix(
-                    y_train_denorm, y_pred_train_denorm, ax=None
+            elif plot_name == 'residuals':
+                plot_url = Visualizer.plot_residuals(
+                    y_test_denorm, y_pred_test_denorm, mean_target, std_target, ax=None
                 )
             elif plot_name == 'rolling_metrics':
-                return Visualizer.plot_rolling_metrics(
-                    y_test_denorm, y_pred_test_denorm, ax=None
-                )
-            elif plot_name == 'volatility_analysis':
-                return Visualizer.plot_volatility_analysis(
-                    original_prices, ax=None
-                )
-            elif plot_name == 'trend_analysis':
-                return Visualizer.plot_trend_analysis(
-                    original_prices, ax=None
-                )
-            elif plot_name == 'seasonality':
-                return Visualizer.plot_seasonality(
-                    original_prices, ax=None
-                )
-            elif plot_name == 'forecast':
-                return Visualizer.plot_forecast(
-                    original_prices, y_pred_test_denorm, ax=None
+                plot_url = Visualizer.plot_rolling_metrics(
+                    y_test_denorm, y_pred_test_denorm, mean_target, std_target, ax=None
                 )
             else:
                 self.logger.warning(f"Unknown plot type: {plot_name}")
                 return None
+            
+            return plot_url
 
         except Exception as e:
             self.logger.error(f"Failed to generate {plot_name} plot", error=str(e))
@@ -627,10 +605,7 @@ class CryptoPredictor:
         """Generate all visualizations (legacy method for backward compatibility)"""
         plots = {}
         plot_names = [
-            'training_history', 'predictions_vs_actual', 'residuals',
-            'price_predictions', 'feature_importance', 'model_performance',
-            'data_distribution', 'correlation_matrix', 'rolling_metrics',
-            'volatility_analysis', 'trend_analysis', 'seasonality', 'forecast'
+            'loss_history', 'price_predictions', 'residuals', 'rolling_metrics'
         ]
 
         for plot_name in plot_names:
