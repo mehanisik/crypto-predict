@@ -1,16 +1,19 @@
 "use client";
 
+import { Activity, BarChart3, TrendingUp } from "lucide-react";
 import {
-	LineChart as ReLineChart,
-	Line,
+	Area,
 	CartesianGrid,
+	Legend,
+	Line,
+	AreaChart as ReAreaChart,
+	LineChart as ReLineChart,
+	ResponsiveContainer,
+	Tooltip,
 	XAxis,
 	YAxis,
-	Tooltip,
-	Legend,
-	ResponsiveContainer,
 } from "recharts";
-import { AreaChart as ReAreaChart, Area } from "recharts";
+import { Badge } from "@/components/ui/badge";
 import {
 	Card,
 	CardContent,
@@ -18,9 +21,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BarChart3, TrendingUp, Activity } from "lucide-react";
 
 import { useMlModelStore } from "@/store";
 
@@ -63,23 +64,32 @@ export function TrainingCharts() {
 				</CardHeader>
 				<CardContent className="flex-1 min-h-0">
 					<div className="h-full overflow-auto space-y-6">
-						{(seriesMap.loss || seriesMap.val_loss || seriesMap.accuracy || seriesMap.val_accuracy) && (
+						{(seriesMap.loss ||
+							seriesMap.val_loss ||
+							seriesMap.accuracy ||
+							seriesMap.val_accuracy) && (
 							<Tabs defaultValue="loss" className="w-full">
 								<TabsList className="grid w-full grid-cols-2">
 									{(seriesMap.loss || seriesMap.val_loss) && (
-										<TabsTrigger value="loss" className="flex items-center gap-2">
+										<TabsTrigger
+											value="loss"
+											className="flex items-center gap-2"
+										>
 											<Activity className="h-4 w-4 text-red-500" />
 											Loss Metrics
 										</TabsTrigger>
 									)}
 									{(seriesMap.accuracy || seriesMap.val_accuracy) && (
-										<TabsTrigger value="accuracy" className="flex items-center gap-2">
+										<TabsTrigger
+											value="accuracy"
+											className="flex items-center gap-2"
+										>
 											<TrendingUp className="h-4 w-4 text-green-500" />
 											Accuracy Metrics
 										</TabsTrigger>
 									)}
 								</TabsList>
-								
+
 								{(seriesMap.loss || seriesMap.val_loss) && (
 									<TabsContent value="loss" className="mt-4">
 										<Card>

@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
+import { useMlModelStore } from "@/store";
 import type {
-	TrainingUpdateEvent,
-	UnifiedServerMessage,
 	LegacyServerMessage,
 	TrainingStage,
+	TrainingUpdateEvent,
+	UnifiedServerMessage,
 } from "@/types/socket";
-import { useMlModelStore } from "@/store";
 
 const WS_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 

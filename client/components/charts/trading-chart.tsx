@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, memo } from "react";
 import { useTheme } from "next-themes";
+import { memo, useEffect, useRef } from "react";
 import type { TradingViewSymbols } from "@/constants/trading-view-symbols.constant";
 
 function TradingViewWidget({ symbol }: { symbol: TradingViewSymbols }) {

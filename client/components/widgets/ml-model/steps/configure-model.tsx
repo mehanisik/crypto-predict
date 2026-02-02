@@ -1,4 +1,16 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import type { z } from "zod";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+	Card,
+	CardContent,
+	CardDescription,
+	CardHeader,
+	CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -8,23 +20,11 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { startTraining } from "@/lib/actions";
-import { useMlModelStore } from "@/store";
-import trainingSchema from "@/schemas/model-training";
-import type { z } from "zod";
-import { Step } from "@/types/ml-model";
 import { TrainingPresets } from "@/constants/training-presets.constant";
+import { startTraining } from "@/lib/actions";
+import trainingSchema from "@/schemas/model-training";
+import { useMlModelStore } from "@/store";
+import { Step } from "@/types/ml-model";
 
 export function ConfigureModelStep() {
 	const training = useMlModelStore((s) => s.training);

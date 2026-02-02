@@ -1,12 +1,12 @@
 import axios from "axios";
-import type { CryptoData, MarketData } from "@/lib/crypto";
 import { unstable_cache as cache } from "next/cache";
 import server, { API_ENDPOINTS } from "@/lib/axios";
+import type { CryptoData, MarketData } from "@/lib/crypto";
 import type {
-	StartTrainingPayload,
-	StartTrainingResponse,
 	PredictionPayload,
 	PredictionResponse,
+	StartTrainingPayload,
+	StartTrainingResponse,
 } from "@/types/ml-model";
 
 export const getMarketStats = cache(async (): Promise<MarketData[]> => {
@@ -37,8 +37,12 @@ export const getMarketStats = cache(async (): Promise<MarketData[]> => {
 			totalSupply: crypto.total_supply,
 			priceHistory: crypto.sparkline_in_7d.price,
 		}));
-	} catch (_error) {
-		return [];
+	} catch (error) {
+		throw new Error(
+			error instanceof Error
+				? `Failed to fetch market data: ${error.message}`
+				: "Failed to fetch market data",
+		);
 	}
 });
 

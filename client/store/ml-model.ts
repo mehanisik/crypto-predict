@@ -1,11 +1,11 @@
 import { create } from "zustand";
 import {
-	Step,
-	type TrainingParams,
-	type PredictionParams,
 	type ConnectionState,
 	type MlMessage,
+	type PredictionParams,
 	type PredictionResponse,
+	Step,
+	type TrainingParams,
 } from "@/types/ml-model";
 
 interface MlModelState {

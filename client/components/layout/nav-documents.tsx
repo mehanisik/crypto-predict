@@ -2,9 +2,9 @@
 
 import {
 	FolderIcon,
+	type LucideIcon,
 	MoreHorizontalIcon,
 	ShareIcon,
-	type LucideIcon,
 } from "lucide-react";
 
 import {

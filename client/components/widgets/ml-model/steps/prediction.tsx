@@ -1,9 +1,11 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { BarChart3, Calendar, CheckCircle, TrendingUp } from "lucide-react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -12,14 +14,12 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { useState } from "react";
-import { useMlModelStore } from "@/store";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import predictionSchema from "@/schemas/model-prediction";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { makePrediction } from "@/lib/actions";
+import predictionSchema from "@/schemas/model-prediction";
+import { useMlModelStore } from "@/store";
 import type { PredictionResponse } from "@/types/ml-model";
-import { TrendingUp, Calendar, BarChart3, CheckCircle } from "lucide-react";
 
 interface FormValues {
 	startDate: string;
@@ -37,7 +37,10 @@ export function PredictionStep() {
 	// Debug logging
 	console.log("🔮 Store predictionResults:", predictionResults);
 	console.log("🔮 Store predictions array:", predictionResults?.predictions);
-	console.log("🔮 Store predictions length:", predictionResults?.predictions?.length);
+	console.log(
+		"🔮 Store predictions length:",
+		predictionResults?.predictions?.length,
+	);
 
 	const form = useForm<FormValues>({
 		resolver: zodResolver(predictionSchema),
@@ -54,7 +57,7 @@ export function PredictionStep() {
 		try {
 			setIsLoading(true);
 			setError(null);
-			
+
 			const startDate = String(
 				formData.get("startDate") || prediction.predStartDate,
 			);
@@ -128,11 +131,14 @@ export function PredictionStep() {
 						</Alert>
 					)}
 
-					<form onSubmit={(e) => {
-						e.preventDefault();
-						const formData = new FormData(e.currentTarget);
-						handleSubmit(formData);
-					}} className="space-y-4">
+					<form
+						onSubmit={(e) => {
+							e.preventDefault();
+							const formData = new FormData(e.currentTarget);
+							handleSubmit(formData);
+						}}
+						className="space-y-4"
+					>
 						<input type="hidden" name="ticker" value={training.ticker} />
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<div className="space-y-2">
@@ -200,8 +206,8 @@ export function PredictionStep() {
 								Prediction Results
 							</span>
 							<Badge variant="outline" className="text-xs">
-								{predictionResults.ticker} • {predictionResults.predictions?.length ?? 0}{" "}
-								predictions
+								{predictionResults.ticker} •{" "}
+								{predictionResults.predictions?.length ?? 0} predictions
 							</Badge>
 						</CardTitle>
 						{predictionResults.data_range && (
@@ -225,7 +231,8 @@ export function PredictionStep() {
 						)}
 					</CardHeader>
 					<CardContent>
-						{predictionResults.predictions && predictionResults.predictions.length > 0 ? (
+						{predictionResults.predictions &&
+						predictionResults.predictions.length > 0 ? (
 							<div className="space-y-4">
 								<div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/20 rounded-lg">
 									<div className="text-center">
@@ -253,8 +260,8 @@ export function PredictionStep() {
 									<div className="text-center">
 										<div className="text-lg font-semibold text-purple-600">
 											{(
-												(predictionResults.predictions[0]?.confidence_score || 0) *
-												100
+												(predictionResults.predictions[0]?.confidence_score ||
+													0) * 100
 											).toFixed(0)}
 											%
 										</div>

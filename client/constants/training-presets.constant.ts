@@ -1,4 +1,4 @@
-import { Settings, TrendingUp, Zap, Target } from "lucide-react";
+import { Settings, Target, TrendingUp, Zap } from "lucide-react";
 
 export const TrainingPresets = [
 	{

@@ -1,24 +1,24 @@
 "use client";
 
 import {
+	Activity,
+	CheckCircle,
+	Clock,
+	Target,
+	TrendingUp,
+	Zap,
+} from "lucide-react";
+import { useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
+import {
 	Card,
 	CardContent,
 	CardDescription,
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import {
-	Activity,
-	CheckCircle,
-	Clock,
-	TrendingUp,
-	Target,
-	Zap,
-} from "lucide-react";
 import { useMlModelStore } from "@/store";
-import { useMemo } from "react";
 
 export function TrainingStatus() {
 	const messages = useMlModelStore((s) => s.messages);
@@ -38,8 +38,7 @@ export function TrainingStatus() {
 				const data = (m.data as Record<string, unknown>) || {};
 				const metrics = (data.metrics as Record<string, number>) || {};
 				return {
-					final_accuracy:
-						(data.final_accuracy as number) ?? metrics.accuracy,
+					final_accuracy: (data.final_accuracy as number) ?? metrics.accuracy,
 					final_loss: (data.final_loss as number) ?? metrics.loss,
 					r2: metrics.r2,
 					mae: metrics.mae,

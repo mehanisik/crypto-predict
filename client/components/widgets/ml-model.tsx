@@ -1,15 +1,15 @@
 "use client";
 
+import { ArrowLeft, RotateCcw, TrendingUp } from "lucide-react";
+import { useEffect } from "react";
+import { useSocket } from "@/hooks/use-socket";
+import { useMlModelStore } from "@/store";
+import { Step } from "@/types/ml-model";
+import { Button } from "../ui/button";
 import { Widget } from "../ui/widget";
 import { ConfigureModelStep } from "./ml-model/steps/configure-model";
-import { TrainingProgressStep } from "./ml-model/steps/training-progress";
 import { PredictionStep } from "./ml-model/steps/prediction";
-import { Step } from "@/types/ml-model";
-import { useMlModelStore } from "@/store";
-import { useSocket } from "@/hooks/use-socket";
-import { useEffect } from "react";
-import { Button } from "../ui/button";
-import { ArrowLeft, RotateCcw, TrendingUp } from "lucide-react";
+import { TrainingProgressStep } from "./ml-model/steps/training-progress";
 
 export default function MachineLearningWidget() {
 	const { connection, step, isTrainingComplete, setStep } = useMlModelStore();

@@ -1,10 +1,10 @@
 "use client";
 
+import { CheckCircle, TrendingUp } from "lucide-react";
 import { useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle, TrendingUp } from "lucide-react";
 import { useMlModelStore } from "@/store";
 
 export function TrainingProgress() {

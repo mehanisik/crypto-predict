@@ -1,8 +1,8 @@
 "use client";
 
-import { TrainingStatus } from "../training-status";
 import { TrainingCharts } from "../training-charts";
 import { TrainingLogs } from "../training-logs";
+import { TrainingStatus } from "../training-status";
 
 export function TrainingProgressStep() {
 	return (

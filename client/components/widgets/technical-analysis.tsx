@@ -1,10 +1,10 @@
 "use client";
 
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useState } from "react";
-import { Widget } from "../ui/widget";
-import { TradingViewSymbols } from "@/constants/trading-view-symbols.constant";
 import TradingViewWidget from "@/components/charts/trading-chart";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { TradingViewSymbols } from "@/constants/trading-view-symbols.constant";
+import { Widget } from "../ui/widget";
 
 export function LiveChartWidget() {
 	const [symbol, setSymbol] = useState<TradingViewSymbols>(

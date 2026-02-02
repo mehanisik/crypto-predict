@@ -1,10 +1,12 @@
 "use client";
 
 import { Maximize2 } from "lucide-react";
-import { Suspense, useState } from "react";
+import { createContext, useContext, useState } from "react";
 import { Button } from "./button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
-import { WidgetSkeleton } from "./widget-skeleton";
+
+const WidgetExpandedContext = createContext(false);
+export const useWidgetExpanded = () => useContext(WidgetExpandedContext);
 
 interface WidgetProps {
 	title: string;
@@ -28,7 +30,7 @@ export function Widget({
 	const [isExpanded, setIsExpanded] = useState(false);
 
 	return (
-		<Suspense fallback={<WidgetSkeleton title={title} />}>
+		<>
 			<section
 				id={id ? id : "container"}
 				role="region"
@@ -71,12 +73,14 @@ export function Widget({
 							<DialogTitle>{title}</DialogTitle>
 							{headerContent}
 						</DialogHeader>
-						<div className="flex-1 overflow-auto p-2">
-							<div className="min-h-full">{children}</div>
+						<div className="flex-1 overflow-auto relative p-2">
+							<WidgetExpandedContext.Provider value={true}>
+								{children}
+							</WidgetExpandedContext.Provider>
 						</div>
 					</DialogContent>
 				</Dialog>
 			</section>
-		</Suspense>
+		</>
 	);
 }

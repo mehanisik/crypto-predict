@@ -8,9 +8,8 @@ import {
 	Timer,
 	Wrench,
 } from "lucide-react";
-
-import { useMlModelStore } from "@/store";
 import { useRef } from "react";
+import { useMlModelStore } from "@/store";
 
 interface MessageRecord {
 	index: number;
