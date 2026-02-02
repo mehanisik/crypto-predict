@@ -183,8 +183,35 @@ def create_app(config_name=None):
     register_error_handlers(app)
 
     # Register blueprints
-    from app.blueprints import api_bp
-    app.register_blueprint(api_bp, url_prefix=f'/api/{config.API_VERSION}')
+    try:
+        from app.blueprints import api_bp
+        app.register_blueprint(api_bp, url_prefix=f'/api/{config.API_VERSION}')
+        logger.info("blueprint_registered: api_bp at /api/%s", config.API_VERSION)
+    except Exception as e:
+        logger.error("blueprint_registration_failed: %s", e, exc_info=True)
+
+    # Root health check (not behind blueprint, always available)
+    @app.route('/')
+    def root_health():
+        return {'status': 'ok', 'service': 'crypto-predict-api'}
+
+    # Diagnostic route to list all registered URL rules
+    @app.route('/debug/routes')
+    def debug_routes():
+        rules = []
+        for rule in app.url_map.iter_rules():
+            rules.append({
+                'endpoint': rule.endpoint,
+                'methods': sorted(rule.methods - {'OPTIONS', 'HEAD'}),
+                'path': rule.rule,
+            })
+        rules.sort(key=lambda r: r['path'])
+        return {'routes': rules, 'count': len(rules)}
+
+    # Log all registered routes at startup
+    for rule in app.url_map.iter_rules():
+        methods = ','.join(sorted(rule.methods - {'OPTIONS', 'HEAD'}))
+        logger.info("route_registered: %s [%s] -> %s", rule.rule, methods, rule.endpoint)
 
     # Setup Prometheus metrics exporter at /metrics
     try:

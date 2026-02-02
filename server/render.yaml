@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: crypto-predict
+    runtime: docker
+    region: frankfurt
+    plan: free
+    rootDir: server
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: CORS_ORIGINS
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true

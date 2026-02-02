@@ -34,7 +34,7 @@ prometheus-flask-exporter==0.23.0
 Flask-Talisman>=1.1.0
 
 # WSGI server
-gunicorn==21.2.0
+gunicorn>=21.2.0,<24.0.0
 eventlet==0.33.3
 python-engineio==4.8.0
 

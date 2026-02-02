@@ -96,6 +96,9 @@ def register_error_handlers(app):
     @app.errorhandler(Exception)
     def handle_generic_error(error):
         """Handle all other errors."""
+        if isinstance(error, HTTPException):
+            return handle_http_error(error)
+
         logger.error("unexpected_error",
                     error=str(error),
                     path=request.path,

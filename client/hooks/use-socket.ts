@@ -10,7 +10,7 @@ import type {
 } from "@/types/socket";
 import { useMlModelStore } from "@/store";
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "http://localhost:5000";
+const WS_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 interface SocketState {
 	isConnected: boolean;

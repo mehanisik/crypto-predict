@@ -59,7 +59,10 @@ class BaseConfig:
 
     def __post_init__(self):
         """Post-initialization validation."""
-        if self.CORS_ORIGINS is None:
+        cors_env = os.getenv('CORS_ORIGINS', '')
+        if cors_env:
+            self.CORS_ORIGINS = [o.strip() for o in cors_env.split(',') if o.strip()]
+        elif self.CORS_ORIGINS is None:
             self.CORS_ORIGINS = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5000']
 
         if not self.SQLALCHEMY_DATABASE_URI:

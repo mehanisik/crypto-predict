@@ -60,7 +60,7 @@ EXPOSE 5000
 
 # Health check
 HEALTHCHECK --interval=60s --timeout=30s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:5000/api/v1/health || exit 1
+    CMD curl -f http://localhost:${PORT:-5000}/api/v1/health || exit 1
 
-# Run the application
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--worker-class", "eventlet", "--timeout", "120", "--max-requests", "1000", "--max-requests-jitter", "100", "--preload", "run:app"]
+# Run the application (1 worker required for eventlet, no --preload for correct monkey-patching)
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --worker-class eventlet --timeout 120 run:app"]
